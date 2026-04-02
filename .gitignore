@@ -1,0 +1,49 @@
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# Local configuration files
+local.properties
+
+# Android Studio/IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Android Studio caches
+.idea/caches/
+.idea/libraries/
+.idea/workspace.xml
+.idea/gradle.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/httpRequests/
+
+# Generated files
+*.apk
+*.ap_
+*.dex
+*.class
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google service config
+google-services.json
+
+# Temporary files
+*.orig
+*.swp
+
+# Misc
+captures/
