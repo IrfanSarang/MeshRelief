@@ -3,7 +3,6 @@ package com.meshrelief.features.setup
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,16 +38,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
 import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenDark
 import com.meshrelief.features.home.MeshGreenLight
 import com.meshrelief.features.home.MeshMid
-import com.meshrelief.features.home.MeshRed
 
-private data class LanguageOption(
+private data class Languageselectionscreen(
     val displayLabel: String,
     val subLabel: String,
     val code: String,
@@ -56,10 +52,10 @@ private data class LanguageOption(
 )
 
 private val languageOptions = listOf(
-    LanguageOption("English", "English", "en"),
-    LanguageOption("\u0939\u093F\u0902\u0926\u0940", "Hindi", "hi"),
-    LanguageOption("\u092E\u0930\u093E\u0920\u0940", "Marathi", "mr"),
-    LanguageOption("\u0627\u0631\u062F\u0648", "Urdu", "ur", isRtl = true)
+    Languageselectionscreen("English", "English", "en"),
+    Languageselectionscreen("\u0939\u093F\u0902\u0926\u0940", "Hindi", "hi"),
+    Languageselectionscreen("\u092E\u0930\u093E\u0920\u0940", "Marathi", "mr"),
+    Languageselectionscreen("\u0627\u0631\u062F\u0648", "Urdu", "ur", isRtl = true)
 )
 
 @Composable
@@ -211,7 +207,7 @@ fun LanguageSelectionScreen(
 
 @Composable
 private fun LanguageCard(
-    option: LanguageOption,
+    option: Languageselectionscreen,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {

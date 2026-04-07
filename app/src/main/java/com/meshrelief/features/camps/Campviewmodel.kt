@@ -34,99 +34,120 @@ data class CampDetailUiState(
     val showBroadcastSheet: Boolean = false,
     val broadcastMessage: String = "",
     val showSnackbar: Boolean = false,
-    val snackbarMessage: String = ""
+    val snackbarMessage: String = "",
+    val filter: CampFilter = CampFilter.ALL,
+    val filtered: List<CampDetail> = emptyList()
 )
 
 @HiltViewModel
 class CampDetailViewModel @Inject constructor() : ViewModel() {
 
+    private val allCamps: List<CampDetail> = listOf(
+        CampDetail(
+            id = "camp_1",
+            name = "Nagpur Relief Hub",
+            type = "Mixed",
+            currentOccupancy = 142,
+            capacity = 200,
+            established = "14 Jul 2025",
+            adminContact = "Rajan Deshmukh",
+            lastUpdated = "2 hrs ago",
+            adminNotes = "Gate 2 is open 24hr. Medical tent is at the north end. Water tanker arrives at 08:00 and 18:00 daily. Blanket stock critically low — prioritise children.",
+            resources = listOf(
+                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
+                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
+                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.AVAILABLE),
+                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.OUT),
+                CampResource("\u26A1", "Power", ResourceStatus.LOW)
+            ),
+            latitude = 21.1458,
+            longitude = 79.0882
+        ),
+        CampDetail(
+            id = "camp_2",
+            name = "Amravati Shelter Point",
+            type = "Shelter",
+            currentOccupancy = 89,
+            capacity = 150,
+            established = "12 Jul 2025",
+            adminContact = "Priya Sharma",
+            lastUpdated = "45 mins ago",
+            adminNotes = "Families with children on ground floor east wing. No open fires near tents. Curfew at 22:00. Report any medical emergency to block coordinator.",
+            resources = listOf(
+                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
+                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
+                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
+                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
+                CampResource("\u26A1", "Power", ResourceStatus.OUT)
+            ),
+            latitude = 20.9333,
+            longitude = 77.7500
+        ),
+        CampDetail(
+            id = "camp_3",
+            name = "Wardha Medical Camp",
+            type = "Medical",
+            currentOccupancy = 197,
+            capacity = 210,
+            established = "11 Jul 2025",
+            adminContact = "Dr. Meena Kulkarni",
+            lastUpdated = "15 mins ago",
+            adminNotes = "Critical patients in Block C. Do not enter without clearance. Oxygen cylinders on reserve only. Next resupply convoy expected tomorrow at noon.",
+            resources = listOf(
+                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.LOW),
+                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
+                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.OUT),
+                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
+                CampResource("\u26A1", "Power", ResourceStatus.AVAILABLE)
+            ),
+            latitude = 20.7453,
+            longitude = 78.6022
+        )
+    )
+
     private val _uiState = MutableStateFlow(CampDetailUiState())
     val uiState: StateFlow<CampDetailUiState> = _uiState
 
+    init {
+        setFilter(CampFilter.ALL)
+    }
+
     fun loadCamp(campId: String) {
-        val detail = when (campId) {
-            "camp_1" -> CampDetail(
-                id = "camp_1",
-                name = "Nagpur Relief Hub",
-                type = "Mixed",
-                currentOccupancy = 142,
-                capacity = 200,
-                established = "14 Jul 2025",
-                adminContact = "Rajan Deshmukh",
-                lastUpdated = "2 hrs ago",
-                adminNotes = "Gate 2 is open 24hr. Medical tent is at the north end. Water tanker arrives at 08:00 and 18:00 daily. Blanket stock critically low — prioritise children.",
-                resources = listOf(
-                    CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
-                    CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.OUT),
-                    CampResource("\u26A1", "Power", ResourceStatus.LOW)
-                ),
-                latitude = 21.1458,
-                longitude = 79.0882
-            )
-            "camp_2" -> CampDetail(
-                id = "camp_2",
-                name = "Amravati Shelter Point",
-                type = "Shelter",
-                currentOccupancy = 89,
-                capacity = 150,
-                established = "12 Jul 2025",
-                adminContact = "Priya Sharma",
-                lastUpdated = "45 mins ago",
-                adminNotes = "Families with children on ground floor east wing. No open fires near tents. Curfew at 22:00. Report any medical emergency to block coordinator.",
-                resources = listOf(
-                    CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
-                    CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                    CampResource("\u26A1", "Power", ResourceStatus.OUT)
-                ),
-                latitude = 20.9333,
-                longitude = 77.7500
-            )
-            "camp_3" -> CampDetail(
-                id = "camp_3",
-                name = "Wardha Medical Camp",
-                type = "Medical",
-                currentOccupancy = 197,
-                capacity = 210,
-                established = "11 Jul 2025",
-                adminContact = "Dr. Meena Kulkarni",
-                lastUpdated = "15 mins ago",
-                adminNotes = "Critical patients in Block C. Do not enter without clearance. Oxygen cylinders on reserve only. Next resupply convoy expected tomorrow at noon.",
-                resources = listOf(
-                    CampResource("\uD83D\uDCA7", "Water", ResourceStatus.LOW),
-                    CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
-                    CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.OUT),
-                    CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                    CampResource("\u26A1", "Power", ResourceStatus.AVAILABLE)
-                ),
-                latitude = 20.7453,
-                longitude = 78.6022
-            )
-            else -> CampDetail(
-                id = campId,
-                name = "Relief Camp $campId",
-                type = "Supply",
-                currentOccupancy = 55,
-                capacity = 120,
-                established = "10 Jul 2025",
-                adminContact = "Field Coordinator",
-                lastUpdated = "1 hr ago",
-                adminNotes = "Supply distribution at 09:00 and 15:00. Bring your allocation slip.",
-                resources = listOf(
-                    CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
-                    CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
-                    CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                    CampResource("\u26A1", "Power", ResourceStatus.LOW)
-                ),
-                latitude = 20.5000,
-                longitude = 78.0000
-            )
-        }
+        val detail = allCamps.find { it.id == campId } ?: CampDetail(
+            id = campId,
+            name = "Relief Camp $campId",
+            type = "Supply",
+            currentOccupancy = 55,
+            capacity = 120,
+            established = "10 Jul 2025",
+            adminContact = "Field Coordinator",
+            lastUpdated = "1 hr ago",
+            adminNotes = "Supply distribution at 09:00 and 15:00. Bring your allocation slip.",
+            resources = listOf(
+                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
+                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
+                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
+                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
+                CampResource("\u26A1", "Power", ResourceStatus.LOW)
+            ),
+            latitude = 20.5000,
+            longitude = 78.0000
+        )
         _uiState.value = _uiState.value.copy(camp = detail)
+    }
+
+    fun setFilter(filter: CampFilter) {
+        val filtered = when (filter) {
+            CampFilter.ALL    -> allCamps
+            CampFilter.ACTIVE -> allCamps.filter {
+                it.currentOccupancy.toFloat() / it.capacity < 0.9f
+            }
+            CampFilter.FULL   -> allCamps.filter {
+                it.currentOccupancy.toFloat() / it.capacity >= 0.9f
+            }
+            CampFilter.NEARBY -> allCamps.take(2)
+        }
+        _uiState.value = _uiState.value.copy(filter = filter, filtered = filtered)
     }
 
     fun openBroadcastSheet() {

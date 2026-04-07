@@ -26,10 +26,29 @@ import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
 import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenDark
-import com.meshrelief.features.home.MeshGreenLight
 import com.meshrelief.features.home.MeshMid
 import com.meshrelief.features.home.MeshRed
+
+enum class CampFilter(val label: String) {
+    ALL("All"),
+    ACTIVE("Active"),
+    FULL("Full"),
+    NEARBY("Nearby")
+}
+
+@Composable
+fun CampFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 12.sp) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MeshGreen,
+            selectedLabelColor = Color.White
+        )
+    )
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +60,7 @@ fun CampsScreen(
     onChatbotClick: () -> Unit,
     onCampClick: (String) -> Unit,
     onAddCampClick: () -> Unit,
-    viewModel: CampViewModel = hiltViewModel()
+    viewModel: CampDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -75,7 +94,7 @@ fun CampsScreen(
                 modifier = Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(CampFilter.values()) { filter ->
+                items(CampFilter.entries.toTypedArray()) { filter ->
                     CampFilterChip(label = filter.label, selected = uiState.filter == filter, onClick = { viewModel.setFilter(filter) })
                 }
             }
@@ -105,6 +124,96 @@ fun CampsScreen(
                     }
                     item { Spacer(Modifier.height(80.dp)) }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CampsTopBar() {
+    TopAppBar(
+        title = { Text("Camps", fontWeight = FontWeight.Bold) },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.White,
+            titleContentColor = MeshDark
+        )
+    )
+}
+
+@Composable
+fun CampCard(camp: CampDetail, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            // Left: colored bar showing occupancy level
+            val fraction = camp.currentOccupancy.toFloat() / camp.capacity
+            val barColor = when {
+                fraction > 0.90f -> MeshRed
+                fraction >= 0.70f -> MeshAmber
+                else -> MeshGreen
+            }
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(barColor)
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            // Middle: camp name, type, occupancy, last updated
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = camp.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MeshDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "${camp.type} · ${camp.currentOccupancy}/${camp.capacity} people",
+                    fontSize = 12.sp,
+                    color = MeshMid
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Updated ${camp.lastUpdated}",
+                    fontSize = 11.sp,
+                    color = Color(0xFFAAAAAA)
+                )
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            // Right: occupancy % badge
+            val pct = (fraction * 100).toInt()
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = barColor.copy(alpha = 0.12f)
+            ) {
+                Text(
+                    text = "$pct%",
+                    color = barColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
             }
         }
     }
