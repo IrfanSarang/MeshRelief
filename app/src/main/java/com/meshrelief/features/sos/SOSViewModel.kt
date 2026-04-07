@@ -2,6 +2,7 @@ package com.meshrelief.features.sos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.model.TriageLevel
 import com.meshrelief.core.util.Constants
 import com.meshrelief.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,15 +13,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class TriageStatus(val label: String, val color: Long) {
-    SAFE("Safe", 0xFF1D9E75),
-    MINOR("Minor injury", 0xFFEF9F27),
-    CRITICAL("Critical", 0xFFE24B4A),
-    UNRESPONSIVE("Unresponsive", 0xFF888780)
-}
+// The local "enum class TriageStatus" has been removed.
+// This file now uses com.meshrelief.core.model.TriageLevel (SAFE, MINOR, CRITICAL, UNKNOWN).
+//
+// Migration note — UNRESPONSIVE → UNKNOWN:
+//   The old local enum had an UNRESPONSIVE value that does not exist in the
+//   canonical TriageLevel. UNRESPONSIVE has been mapped to UNKNOWN because
+//   both indicate the same UX outcome (person cannot self-report). If a
+//   distinct UNRESPONSIVE state is needed in the future it should be added
+//   to TriageLevel in core/model/ rather than re-introduced locally.
+//
+// label / color are now sourced from TriageLevel.label and TriageLevel.color
+// so the UI layer no longer needs to maintain its own colour mapping.
 
 data class SOSUiState(
-    val selectedTriage: TriageStatus = TriageStatus.SAFE,
+    val selectedTriage: TriageLevel = TriageLevel.SAFE,   // was: local TriageStatus
     val showConfirmDialog: Boolean = false,
     val confirmCountdown: Int = 10,
     val cooldownRemainingMs: Long = 0L,
@@ -53,7 +60,7 @@ class SOSViewModel @Inject constructor(
         }
     }
 
-    fun onTriageSelected(triage: TriageStatus) {
+    fun onTriageSelected(triage: TriageLevel) {             // was: local TriageStatus
         _uiState.value = _uiState.value.copy(selectedTriage = triage)
     }
 
@@ -73,7 +80,7 @@ class SOSViewModel @Inject constructor(
             sosSent = true
         )
         startCooldown()
-        // WiFi Direct broadcast will be added in Phase 2
+        // Wi-Fi Direct broadcast will be added in Phase 2
     }
 
     fun onCancelSOS() {
@@ -98,8 +105,8 @@ class SOSViewModel @Inject constructor(
 
     private fun startCooldown() {
         val cooldownMs = when (_uiState.value.selectedTriage) {
-            TriageStatus.CRITICAL -> Constants.SOS_COOLDOWN_CRITICAL_MS
-            else -> Constants.SOS_COOLDOWN_DEFAULT_MS
+            TriageLevel.CRITICAL -> Constants.SOS_COOLDOWN_CRITICAL_MS
+            else                 -> Constants.SOS_COOLDOWN_DEFAULT_MS
         }
         _uiState.value = _uiState.value.copy(cooldownRemainingMs = cooldownMs)
 

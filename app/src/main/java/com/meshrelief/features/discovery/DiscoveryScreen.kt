@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.core.model.TriageLevel
 import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
@@ -523,12 +524,12 @@ private fun PeerCard(peer: DiscoveredPeer, onConnect: () -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun TriageBadge(triage: TriageStatus) {
+private fun TriageBadge(triage: TriageLevel) {
     val (label, bg, fg) = when (triage) {
-        TriageStatus.SAFE     -> Triple("Safe",     Color(0xFFE1F5EE), Color(0xFF085041))
-        TriageStatus.MINOR    -> Triple("Minor",    Color(0xFFFAEEDA), Color(0xFF854F0B))
-        TriageStatus.CRITICAL -> Triple("Critical", Color(0xFFFCEBEB), Color(0xFFA32D2D))
-        TriageStatus.UNKNOWN  -> Triple("Unknown",  Color(0xFFF1EFE8), Color(0xFF5F5E5A))
+        TriageLevel.SAFE     -> Triple("Safe",     Color(0xFFE1F5EE), Color(0xFF085041))
+        TriageLevel.MINOR    -> Triple("Minor",    Color(0xFFFAEEDA), Color(0xFF854F0B))
+        TriageLevel.CRITICAL -> Triple("Critical", Color(0xFFFCEBEB), Color(0xFFA32D2D))
+        TriageLevel.UNKNOWN  -> Triple("Unknown",  Color(0xFFF1EFE8), Color(0xFF5F5E5A))
     }
     Row(
         modifier = Modifier
@@ -698,9 +699,9 @@ private fun EmptyState(modifier: Modifier = Modifier, onRescan: () -> Unit) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-private fun triageColor(triage: TriageStatus): Color = when (triage) {
-    TriageStatus.SAFE     -> MeshGreen
-    TriageStatus.MINOR    -> MeshAmber
-    TriageStatus.CRITICAL -> MeshRed
-    TriageStatus.UNKNOWN  -> MeshMid
+private fun triageColor(triage: TriageLevel): Color = when (triage) {
+    TriageLevel.SAFE     -> MeshGreen
+    TriageLevel.MINOR    -> MeshAmber
+    TriageLevel.CRITICAL -> MeshRed
+    TriageLevel.UNKNOWN  -> MeshMid
 }

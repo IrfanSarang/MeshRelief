@@ -3,24 +3,17 @@ package com.meshrelief.features.setup
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class LanguageSelectionViewModel @Inject constructor(
-    private val dataStore: DataStore<Preferences>
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
-
-    companion object {
-        val LANGUAGE_KEY = stringPreferencesKey("preferred_language")
-    }
 
     var selectedLanguage by mutableStateOf("en")
         private set
@@ -35,9 +28,7 @@ class LanguageSelectionViewModel @Inject constructor(
     fun confirmAndSave(onDone: () -> Unit) {
         isSaving = true
         viewModelScope.launch {
-            dataStore.edit { prefs ->
-                prefs[LANGUAGE_KEY] = selectedLanguage
-            }
+            userPreferences.saveLanguage(selectedLanguage)
             isSaving = false
             onDone()
         }

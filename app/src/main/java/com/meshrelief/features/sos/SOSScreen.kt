@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.core.model.TriageStatus
+import com.meshrelief.core.model.TriageLevel
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
 import com.meshrelief.features.home.MeshGreen
@@ -91,7 +93,7 @@ fun SOSScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TriageStatus.entries.forEach { triage ->
+                TriageLevel.entries.forEach { triage ->
                     val selected = uiState.selectedTriage == triage
                     val triageColor = Color(triage.color)
                     Box(

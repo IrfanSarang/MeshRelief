@@ -2,6 +2,7 @@ package com.meshrelief.features.admin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.model.TriageStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,19 +14,22 @@ import javax.inject.Inject
 
 // ── Data models ──────────────────────────────────────────────────────────────
 
-enum class TriageLevel { GREEN, AMBER, RED, UNKNOWN }
+// The local "enum class TriageLevel" has been removed.
+// All former TriageLevel references now use com.meshrelief.core.model.TriageStatus
+// (GREEN, AMBER, RED, UNKNOWN) which is the correct network/map-layer indicator
+// for the admin view.
 
 data class AdminPeer(
     val id: String,
     val name: String,
-    val triage: TriageLevel,
+    val triage: TriageStatus,          // was: TriageLevel
     val lastSeenMinutesAgo: Int
 )
 
 data class AdminSosAlert(
     val id: String,
     val senderName: String,
-    val triage: TriageLevel,
+    val triage: TriageStatus,          // was: TriageLevel
     val lat: Double,
     val lon: Double,
     val minutesAgo: Int,
@@ -70,25 +74,25 @@ class AdminViewModel @Inject constructor() : ViewModel() {
 
     private fun loadSampleData() {
         val samplePeers = listOf(
-            AdminPeer("p1", "Ravi-Android-7", TriageLevel.GREEN, 2),
-            AdminPeer("p2", "Priya-Device-3", TriageLevel.AMBER, 5),
-            AdminPeer("p3", "Arjun-Phone-12", TriageLevel.RED, 1),
-            AdminPeer("p4", "Meera-Tab-2", TriageLevel.GREEN, 8),
-            AdminPeer("p5", "Suresh-Node-5", TriageLevel.UNKNOWN, 15),
-            AdminPeer("p6", "Fatima-Phone-9", TriageLevel.GREEN, 3)
+            AdminPeer("p1", "Ravi-Android-7",  TriageStatus.GREEN,   2),
+            AdminPeer("p2", "Priya-Device-3",  TriageStatus.AMBER,   5),
+            AdminPeer("p3", "Arjun-Phone-12",  TriageStatus.RED,     1),
+            AdminPeer("p4", "Meera-Tab-2",     TriageStatus.GREEN,   8),
+            AdminPeer("p5", "Suresh-Node-5",   TriageStatus.UNKNOWN, 15),
+            AdminPeer("p6", "Fatima-Phone-9",  TriageStatus.GREEN,   3)
         )
 
         val sampleSos = listOf(
-            AdminSosAlert("s1", "Arjun-Phone-12", TriageLevel.RED, 19.0760, 72.8777, 3),
-            AdminSosAlert("s2", "Priya-Device-3", TriageLevel.AMBER, 19.0821, 72.8856, 11),
-            AdminSosAlert("s3", "Suresh-Node-5", TriageLevel.UNKNOWN, 19.0700, 72.8700, 22)
+            AdminSosAlert("s1", "Arjun-Phone-12", TriageStatus.RED,     19.0760, 72.8777, 3),
+            AdminSosAlert("s2", "Priya-Device-3", TriageStatus.AMBER,   19.0821, 72.8856, 11),
+            AdminSosAlert("s3", "Suresh-Node-5",  TriageStatus.UNKNOWN, 19.0700, 72.8700, 22)
         )
 
         val sampleCamps = listOf(
-            AdminCamp("c1", "Relief Camp Alpha", 87, 120),
-            AdminCamp("c2", "Shelter Block B", 45, 60),
-            AdminCamp("c3", "Medical Tent C", 12, 20),
-            AdminCamp("c4", "Community Hall D", 200, 300)
+            AdminCamp("c1", "Relief Camp Alpha",  87,  120),
+            AdminCamp("c2", "Shelter Block B",    45,   60),
+            AdminCamp("c3", "Medical Tent C",     12,   20),
+            AdminCamp("c4", "Community Hall D",  200,  300)
         )
 
         _uiState.update {
@@ -142,7 +146,7 @@ class AdminViewModel @Inject constructor() : ViewModel() {
             val newPeer = AdminPeer(
                 id = "p_new_${System.currentTimeMillis()}",
                 name = "NewDevice-${(10..99).random()}",
-                triage = TriageLevel.UNKNOWN,
+                triage = TriageStatus.UNKNOWN,
                 lastSeenMinutesAgo = 0
             )
             _uiState.update { state ->

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.core.model.TriageStatus
 import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
@@ -34,18 +35,18 @@ import com.meshrelief.features.home.MeshRed
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun triageColor(level: TriageLevel): Color = when (level) {
-    TriageLevel.GREEN   -> Color(0xFF1D9E75)
-    TriageLevel.AMBER   -> Color(0xFFEF9F27)
-    TriageLevel.RED     -> Color(0xFFE24B4A)
-    TriageLevel.UNKNOWN -> Color(0xFF9E9E9E)
+private fun triageColor(level: TriageStatus): Color = when (level) {
+    TriageStatus.GREEN   -> Color(0xFF1D9E75)
+    TriageStatus.AMBER   -> Color(0xFFEF9F27)
+    TriageStatus.RED     -> Color(0xFFE24B4A)
+    TriageStatus.UNKNOWN -> Color(0xFF9E9E9E)
 }
 
-private fun triageLabel(level: TriageLevel): String = when (level) {
-    TriageLevel.GREEN   -> "GREEN"
-    TriageLevel.AMBER   -> "AMBER"
-    TriageLevel.RED     -> "RED"
-    TriageLevel.UNKNOWN -> "UNKNOWN"
+private fun triageLabel(level: TriageStatus): String = when (level) {
+    TriageStatus.GREEN   -> "GREEN"
+    TriageStatus.AMBER   -> "AMBER"
+    TriageStatus.RED     -> "RED"
+    TriageStatus.UNKNOWN -> "UNKNOWN"
 }
 
 private fun lastSeenLabel(minutes: Int): String = when {

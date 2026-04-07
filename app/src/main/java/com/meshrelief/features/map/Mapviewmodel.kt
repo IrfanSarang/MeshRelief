@@ -1,6 +1,7 @@
 package com.meshrelief.features.map
 
 import androidx.lifecycle.ViewModel
+import com.meshrelief.core.model.TriageStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +11,8 @@ import javax.inject.Inject
 
 // ── Data models ──────────────────────────────────────────────────────────────
 
-enum class TriageStatus { GREEN, AMBER, RED, UNKNOWN }
+// TriageStatus is now com.meshrelief.core.model.TriageStatus (GREEN, AMBER, RED, UNKNOWN).
+// The local enum class has been removed.
 
 data class PeerMapMarker(
     val id: String,

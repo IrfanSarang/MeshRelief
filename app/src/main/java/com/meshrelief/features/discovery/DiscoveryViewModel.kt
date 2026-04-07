@@ -2,6 +2,7 @@ package com.meshrelief.features.discovery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.model.TriageLevel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,7 +17,13 @@ import javax.inject.Inject
 // Data models
 // ---------------------------------------------------------------------------
 
-enum class TriageStatus { SAFE, MINOR, CRITICAL, UNKNOWN }
+// The local "enum class TriageStatus { SAFE, MINOR, CRITICAL, UNKNOWN }" has
+// been removed. This file now uses com.meshrelief.core.model.TriageLevel which
+// carries the same four values plus label/color metadata.
+//
+// Note: DiscoveryViewModel intentionally uses TriageLevel (patient-facing clinical
+// scale) rather than TriageStatus (network colour indicator). See core/model/ for
+// the distinction.
 
 enum class ConnectionState { CONNECTED, CONNECTING, AVAILABLE }
 
@@ -26,7 +33,7 @@ data class DiscoveredPeer(
     val id: String,
     val displayName: String,
     val deviceIdSuffix: String,      // last 4 chars, e.g. "3821"
-    val triage: TriageStatus,
+    val triage: TriageLevel,         // was: local TriageStatus
     val signalBars: Int,             // 1–4
     val hopCount: Int,               // 0 = direct
     val connectionState: ConnectionState
@@ -55,12 +62,12 @@ class DiscoveryViewModel @Inject constructor() : ViewModel() {
 
     // Seed data — 6 varied peers
     private val seedPeers = listOf(
-        DiscoveredPeer("p1", "Ravi Kumar",     "4401", TriageStatus.CRITICAL,  4, 0, ConnectionState.CONNECTED),
-        DiscoveredPeer("p2", "Anjali Singh",   "2893", TriageStatus.SAFE,      3, 0, ConnectionState.CONNECTED),
-        DiscoveredPeer("p3", "Mohammed Faiz",  "7712", TriageStatus.MINOR,     2, 1, ConnectionState.AVAILABLE),
-        DiscoveredPeer("p4", "Priya Nair",     "5530", TriageStatus.UNKNOWN,   1, 2, ConnectionState.AVAILABLE),
-        DiscoveredPeer("p5", "Suresh Patil",   "3380", TriageStatus.SAFE,      3, 1, ConnectionState.CONNECTING),
-        DiscoveredPeer("p6", "Deepa Menon",    "9921", TriageStatus.CRITICAL,  2, 2, ConnectionState.AVAILABLE),
+        DiscoveredPeer("p1", "Ravi Kumar",    "4401", TriageLevel.CRITICAL, 4, 0, ConnectionState.CONNECTED),
+        DiscoveredPeer("p2", "Anjali Singh",  "2893", TriageLevel.SAFE,     3, 0, ConnectionState.CONNECTED),
+        DiscoveredPeer("p3", "Mohammed Faiz", "7712", TriageLevel.MINOR,    2, 1, ConnectionState.AVAILABLE),
+        DiscoveredPeer("p4", "Priya Nair",    "5530", TriageLevel.UNKNOWN,  1, 2, ConnectionState.AVAILABLE),
+        DiscoveredPeer("p5", "Suresh Patil",  "3380", TriageLevel.SAFE,     3, 1, ConnectionState.CONNECTING),
+        DiscoveredPeer("p6", "Deepa Menon",   "9921", TriageLevel.CRITICAL, 2, 2, ConnectionState.AVAILABLE),
     )
 
     init {
@@ -129,10 +136,10 @@ class DiscoveryViewModel @Inject constructor() : ViewModel() {
             SortMode.TRIAGE -> peers.sortedWith(
                 compareBy {
                     when (it.triage) {
-                        TriageStatus.CRITICAL -> 0
-                        TriageStatus.MINOR    -> 1
-                        TriageStatus.SAFE     -> 2
-                        TriageStatus.UNKNOWN  -> 3
+                        TriageLevel.CRITICAL -> 0
+                        TriageLevel.MINOR    -> 1
+                        TriageLevel.SAFE     -> 2
+                        TriageLevel.UNKNOWN  -> 3
                     }
                 }
             )
