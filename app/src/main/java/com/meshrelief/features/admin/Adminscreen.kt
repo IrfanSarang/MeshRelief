@@ -63,6 +63,7 @@ private fun lastSeenLabel(minutes: Int): String = when {
 fun AdminScreen(
     onBack: () -> Unit,
     onEvacuationClick: () -> Unit,
+    onTopologyClick: () -> Unit,                          // ← FIX #13 added
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -162,61 +163,89 @@ fun AdminScreen(
                 BulletinEntryRow(entry = entry)
             }
 
-            // ── Evacuation Route ───────────────────────────────────────────────────
+            // ── Network Topology ───────────────────────────────────────────  ← FIX #13
+            item { SectionHeader(title = "Network Topology", icon = Icons.Default.AccountTree) }
+            item {
+                AdminNavCard(
+                    title       = "View Network Topology",
+                    subtitle    = "Visual map of all mesh node connections",
+                    icon        = Icons.Default.AccountTree,
+                    onClick     = onTopologyClick
+                )
+            }
+
+            // ── Evacuation Route ───────────────────────────────────────────
             item { SectionHeader(title = "Evacuation Route", icon = Icons.Default.AltRoute) }
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clickable { onEvacuationClick() },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MeshGreenLight),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AltRoute,
-                                contentDescription = null,
-                                tint = MeshGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = "Draw evacuation route",
-                                fontWeight = FontWeight.SemiBold,
-                                color = MeshDark,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Tap waypoints on map \u00b7 broadcasts to all peers",
-                                fontSize = 11.sp,
-                                color = MeshMid
-                            )
-                        }
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MeshMid,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
+                AdminNavCard(
+                    title    = "Draw evacuation route",
+                    subtitle = "Tap waypoints on map · broadcasts to all peers",
+                    icon     = Icons.Default.AltRoute,
+                    onClick  = onEvacuationClick
+                )
             }
+        }
+    }
+}
+
+// ── Generic admin nav card (replaces the inline Card blocks) ──────────────────
+
+@Composable
+private fun AdminNavCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MeshGreenLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MeshGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MeshDark,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MeshMid
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MeshMid,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -407,7 +436,6 @@ private fun PeerRow(peer: AdminPeer) {
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar circle
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -439,7 +467,6 @@ private fun PeerRow(peer: AdminPeer) {
                 )
             }
             Spacer(Modifier.width(8.dp))
-            // Triage chip
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = tColor.copy(alpha = 0.15f),
@@ -454,7 +481,6 @@ private fun PeerRow(peer: AdminPeer) {
                 )
             }
             Spacer(Modifier.width(8.dp))
-            // Quick actions
             IconButton(onClick = { /* stub: send message */ }, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Message, contentDescription = "Message", tint = MeshMid, modifier = Modifier.size(18.dp))
             }
@@ -481,12 +507,7 @@ private fun SosAlertCard(alert: AdminSosAlert, onAcknowledge: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = MeshRed,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.Warning, contentDescription = null, tint = MeshRed, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = alert.senderName,
@@ -513,19 +534,11 @@ private fun SosAlertCard(alert: AdminSosAlert, onAcknowledge: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = MeshMid, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    text = "%.4f, %.4f".format(alert.lat, alert.lon),
-                    fontSize = 12.sp,
-                    color = MeshMid
-                )
+                Text(text = "%.4f, %.4f".format(alert.lat, alert.lon), fontSize = 12.sp, color = MeshMid)
                 Spacer(Modifier.width(12.dp))
                 Icon(Icons.Default.AccessTime, contentDescription = null, tint = MeshMid, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    text = lastSeenLabel(alert.minutesAgo),
-                    fontSize = 12.sp,
-                    color = MeshMid
-                )
+                Text(text = lastSeenLabel(alert.minutesAgo), fontSize = 12.sp, color = MeshMid)
             }
             Spacer(Modifier.height(10.dp))
             Button(
@@ -654,27 +667,12 @@ private fun BulletinEntryRow(entry: BulletinEntry) {
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Icon(
-            Icons.Default.Campaign,
-            contentDescription = null,
-            tint = MeshGreen,
-            modifier = Modifier
-                .size(16.dp)
-                .padding(top = 2.dp)
-        )
+        Icon(Icons.Default.Campaign, contentDescription = null, tint = MeshGreen,
+            modifier = Modifier.size(16.dp).padding(top = 2.dp))
         Spacer(Modifier.width(8.dp))
-        Text(
-            text = entry.message,
-            fontSize = 13.sp,
-            color = MeshDark,
-            modifier = Modifier.weight(1f)
-        )
+        Text(text = entry.message, fontSize = 13.sp, color = MeshDark, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Text(
-            text = entry.timeLabel,
-            fontSize = 10.sp,
-            color = MeshMid
-        )
+        Text(text = entry.timeLabel, fontSize = 10.sp, color = MeshMid)
     }
 }
 
@@ -689,12 +687,7 @@ private fun EmptyStateRow(message: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = MeshGreen,
-            modifier = Modifier.size(16.dp)
-        )
+        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MeshGreen, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
         Text(text = message, fontSize = 13.sp, color = MeshMid)
     }

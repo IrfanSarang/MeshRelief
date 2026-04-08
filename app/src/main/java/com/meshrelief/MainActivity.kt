@@ -1,42 +1,111 @@
 package com.meshrelief
 
+import android.Manifest
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.core.event.AppEventBus
 import com.meshrelief.features.admin.AdminScreen
-import dagger.hilt.android.AndroidEntryPoint
-
-import com.meshrelief.features.home.HomeScreen
-import com.meshrelief.features.sos.SOSScreen
-import com.meshrelief.features.status.StatusScreen
-import com.meshrelief.features.status.MyStatusScreen
 import com.meshrelief.features.bulletin.BulletinScreen
-import com.meshrelief.features.discovery.DiscoveryScreen
-import com.meshrelief.features.chat.ChatScreen
 import com.meshrelief.features.camps.AddCampScreen
 import com.meshrelief.features.camps.CampDetailScreen
 import com.meshrelief.features.camps.CampsScreen
+import com.meshrelief.features.chat.ChatScreen
 import com.meshrelief.features.chatbot.ChatbotScreen
+import com.meshrelief.features.discovery.DiscoveryScreen
 import com.meshrelief.features.evacuation.EvacuationRouteScreen
 import com.meshrelief.features.firstaid.FirstAidScreen
+import com.meshrelief.features.home.HomeScreen
 import com.meshrelief.features.map.MapScreen
-import com.meshrelief.features.setup.SetupScreen
-import com.meshrelief.features.setup    .LanguageSelectionScreen
 import com.meshrelief.features.setup.LanguageSelectionScreen
+import com.meshrelief.features.setup.SetupScreen
 import com.meshrelief.features.sos.IncomingSosAlertScreen
+import com.meshrelief.features.sos.SOSScreen
+import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.features.status.MyStatusScreen
+import com.meshrelief.features.status.StatusScreen
 import com.meshrelief.features.topology.TopologyScreen
+import com.meshrelief.service.MeshForegroundService
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import com.meshrelief.mesh.wifi.WifiDirectManager
+import javax.inject.Inject
+import com.meshrelief.features.navigate.NavigateToCampScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var wifiDirectManager: WifiDirectManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val serviceIntent = Intent(this, MeshForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+
         setContent {
-            AppRoot()
+            LocationPermissionGate {
+                AppRoot()
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        wifiDirectManager.initialize()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        wifiDirectManager.shutdown()
+    }
+}
+
+@Composable
+private fun LocationPermissionGate(content: @Composable () -> Unit) {
+    var permissionResolved by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        permissionResolved = true
+    }
+
+    LaunchedEffect(Unit) {
+        launcher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    if (permissionResolved) {
+        content()
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
     }
 }
@@ -45,28 +114,32 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(
     viewModel: MainViewModel = hiltViewModel()
 ) {
-    // null = still loading, false = setup needed, true = go to home
     val setupComplete by viewModel.setupComplete.collectAsState()
 
-    // Block rendering until DataStore has emitted its first value
     if (setupComplete == null) {
-        Box(modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-            contentAlignment = androidx.compose.ui.Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
     }
 
     var currentScreen by remember(setupComplete) {
-        // setupComplete is non-null here; route accordingly
         mutableStateOf(if (setupComplete == true) "home" else "setup")
     }
-    var selectedCampId by remember { mutableStateOf<String?>(null) }
+    var selectedCampId     by remember { mutableStateOf<String?>(null) }
+    var navigateToCampId   by remember { mutableStateOf<String?>(null) }
+    var incomingSosPacket by remember { mutableStateOf<MeshPacket?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        AppEventBus.incomingSos.collect { packet ->
+            incomingSosPacket = packet
+            currentScreen     = "incomingsos"
+        }
+    }
 
     when (currentScreen) {
 
-        // ── Onboarding ──────────────────────────────────────────────────────
         "setup" -> SetupScreen(
             onSetupComplete = { currentScreen = "language" }
         )
@@ -74,34 +147,70 @@ fun AppRoot(
             onConfirm = { currentScreen = "home" }
         )
 
-        // ── Main app ─────────────────────────────────────────────────────────
         "home" -> HomeScreen(
-            onSOSClick       = { currentScreen = "sos" },
-            onChatClick      = { currentScreen = "chat" },
-            onMapClick       = { },
-            onStatusClick    = { currentScreen = "status" },
-            onChatbotClick   = { },
-            onDiscoveryClick = { currentScreen = "discovery" },
-            onCampsClick     = { currentScreen = "camps" }
+            onSOSClick        = { currentScreen = "sos" },
+            onChatClick       = { currentScreen = "chat" },
+            onMapClick        = { },
+            onStatusClick     = { currentScreen = "status" },
+            onChatbotClick    = { },
+            onDiscoveryClick  = { currentScreen = "discovery" },
+            onCampsClick      = { currentScreen = "camps" },
+            onFakeIncomingSos = {
+                scope.launch {
+                    AppEventBus.incomingSos.emit(
+                        MeshPacket(
+                            id          = "fake-sos-001",
+                            type        = PacketType.SOS_ALERT,
+                            senderId    = "dev-device",
+                            senderName  = "Test User",
+                            senderPhone = "0000000000",
+                            payload     = "DEV: Fake SOS triggered",
+                            ttl         = 3,
+                            timestamp   = System.currentTimeMillis(),
+                            signature   = ""
+                        )
+                    )
+                }
+            }
         )
-        "sos"      -> SOSScreen(onBack = { currentScreen = "home" })
-        "status"   -> StatusScreen(onMyStatusClick = { currentScreen = "mystatus" })
-        "mystatus" -> MyStatusScreen(onBack = { currentScreen = "status" })
+
+        "sos" -> SOSScreen(
+            onBack = { currentScreen = "home" }
+        )
+
+        "incomingsos" -> IncomingSosAlertScreen(
+            packet     = incomingSosPacket,
+            onDismiss  = { currentScreen = "home" },
+            onNavigate = { currentScreen = "map" }
+        )
+
+        "status"   -> StatusScreen(
+            onMyStatusClick = { currentScreen = "mystatus" }
+        )
+        "mystatus" -> MyStatusScreen(
+            onBack = { currentScreen = "status" }
+        )
+
         "bulletin" -> BulletinScreen(
-            onBack        = { currentScreen = "home" },
-            onHomeClick   = { currentScreen = "home" },
-            onChatClick   = { currentScreen = "chat" },
-            onMapClick    = { currentScreen = "map" },
-            onStatusClick = { currentScreen = "status" },
+            onBack         = { currentScreen = "home" },
+            onHomeClick    = { currentScreen = "home" },
+            onChatClick    = { currentScreen = "chat" },
+            onMapClick     = { currentScreen = "map" },
+            onStatusClick  = { currentScreen = "status" },
             onChatbotClick = { currentScreen = "chatbot" }
         )
-        "discovery" -> DiscoveryScreen(onBack = { currentScreen = "home" })
+
+        "discovery" -> DiscoveryScreen(
+            onBack = { currentScreen = "home" }
+        )
+
         "chat" -> ChatScreen(
             onHomeClick    = { currentScreen = "home" },
             onMapClick     = { currentScreen = "map" },
             onStatusClick  = { currentScreen = "status" },
             onChatbotClick = { currentScreen = "chatbot" }
         )
+
         "camps" -> CampsScreen(
             onHomeClick    = { currentScreen = "home" },
             onChatClick    = { currentScreen = "chat" },
@@ -110,7 +219,7 @@ fun AppRoot(
             onChatbotClick = { currentScreen = "chatbot" },
             onCampClick    = { id ->
                 selectedCampId = id
-                currentScreen = "campdetail"
+                currentScreen  = "campdetail"
             },
             onAddCampClick = { currentScreen = "addcamp" }
         )
@@ -120,7 +229,10 @@ fun AppRoot(
                 CampDetailScreen(
                     campId          = id,
                     onBack          = { currentScreen = "camps" },
-                    onNavigateClick = { /* TODO: open map with route to camp */ }
+                    onNavigateClick = {
+                        navigateToCampId = selectedCampId
+                        currentScreen = "navigate"
+                    }
                 )
             } else {
                 currentScreen = "camps"
@@ -130,28 +242,65 @@ fun AppRoot(
             onBack      = { currentScreen = "camps" },
             onBroadcast = { currentScreen = "camps" }
         )
+        "navigate" -> {
+            val id = navigateToCampId
+            if (id != null) {
+                NavigateToCampScreen(
+                    campId = id,
+                    onBack = { currentScreen = "campdetail" }
+                )
+            } else {
+                currentScreen = "camps"
+            }
+        }
+
         "map" -> MapScreen(
             onHomeClick    = { currentScreen = "home" },
             onChatClick    = { currentScreen = "chat" },
             onStatusClick  = { currentScreen = "status" },
             onChatbotClick = { currentScreen = "chatbot" }
         )
+
         "chatbot" -> ChatbotScreen(
             onHomeClick   = { currentScreen = "home" },
             onChatClick   = { currentScreen = "chat" },
             onMapClick    = { currentScreen = "map" },
             onStatusClick = { currentScreen = "status" }
         )
-        "admin" -> AdminScreen(
-            onBack            = { currentScreen = "home" },
-            onEvacuationClick = { currentScreen = "evacuation" }
-        )
-        "firstaid"  -> FirstAidScreen(onBack = { currentScreen = "home" })
-        "topology"  -> TopologyScreen(onBack = { currentScreen = "home" })
+
+        "admin" -> {
+            val isAdmin: Boolean? by viewModel.isAdmin.collectAsState()
+            when (isAdmin) {
+                null -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                true -> {
+                    AdminScreen(
+                        onBack            = { currentScreen = "home" },
+                        onEvacuationClick = { currentScreen = "evacuation" },
+                        onTopologyClick   = { currentScreen = "topology" }  // ← FIX #13
+                    )
+                }
+                false -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(text = "Access Denied")
+                            Button(onClick = { currentScreen = "home" }) {
+                                Text(text = "Go Back")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        "firstaid"   -> FirstAidScreen(onBack = { currentScreen = "home" })
+        "topology"   -> TopologyScreen(onBack = { currentScreen = "admin" })  // ← FIX #13 back→admin
         "evacuation" -> EvacuationRouteScreen(onBack = { currentScreen = "admin" })
-        "incomingsos" -> IncomingSosAlertScreen(
-            onDismiss  = { currentScreen = "home" },
-            onNavigate = { currentScreen = "map" }
-        )
     }
 }

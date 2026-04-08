@@ -14,11 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.R
 
 val MeshGreen = Color(0xFF1D9E75)
 val MeshGreenLight = Color(0xFFE1F5EE)
@@ -61,7 +63,6 @@ fun SetupScreen(
     ) {
         Spacer(modifier = Modifier.height(48.dp))
 
-        // App icon placeholder
         Box(
             modifier = Modifier
                 .size(64.dp)
@@ -69,41 +70,27 @@ fun SetupScreen(
                 .background(MeshGreen),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "MR",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
+            Text(text = "MR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "MeshRelief",
+            text = stringResource(R.string.app_name),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = MeshGreenDark
         )
 
-        Text(
-            text = "Offline emergency communication",
-            fontSize = 13.sp,
-            color = MeshMid
-        )
-
-        Text(
-            text = "Works without internet",
-            fontSize = 12.sp,
-            color = MeshMid
-        )
+        Text(text = stringResource(R.string.setup_tagline), fontSize = 13.sp, color = MeshMid)
+        Text(text = stringResource(R.string.setup_works_offline), fontSize = 12.sp, color = MeshMid)
 
         Spacer(modifier = Modifier.height(36.dp))
 
         // Name field
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "Your name",
+                text = stringResource(R.string.setup_name_label),
                 fontSize = 12.sp,
                 color = MeshMid,
                 modifier = Modifier.padding(bottom = 6.dp)
@@ -112,7 +99,7 @@ fun SetupScreen(
                 value = uiState.name,
                 onValueChange = viewModel::onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Enter your full name") },
+                placeholder = { Text(stringResource(R.string.setup_name_placeholder)) },
                 isError = uiState.nameError != null,
                 supportingText = {
                     uiState.nameError?.let {
@@ -129,7 +116,7 @@ fun SetupScreen(
         // Phone field
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "Mobile number",
+                text = stringResource(R.string.setup_phone_label),
                 fontSize = 12.sp,
                 color = MeshMid,
                 modifier = Modifier.padding(bottom = 6.dp)
@@ -138,7 +125,7 @@ fun SetupScreen(
                 value = uiState.phone,
                 onValueChange = { if (it.length <= 10) viewModel.onPhoneChange(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("10-digit mobile number") },
+                placeholder = { Text(stringResource(R.string.setup_phone_placeholder)) },
                 prefix = { Text("+91 ") },
                 isError = uiState.phoneError != null,
                 supportingText = {
@@ -157,7 +144,7 @@ fun SetupScreen(
         // Language selection
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "Preferred language",
+                text = stringResource(R.string.setup_language_label),
                 fontSize = 12.sp,
                 color = MeshMid,
                 modifier = Modifier.padding(bottom = 10.dp)
@@ -169,9 +156,7 @@ fun SetupScreen(
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (selected) MeshGreenLight else Color.White
-                        )
+                        .background(if (selected) MeshGreenLight else Color.White)
                         .border(
                             width = if (selected) 1.5.dp else 0.5.dp,
                             color = if (selected) MeshGreen else Color(0xFFD3D1C7),
@@ -198,9 +183,7 @@ fun SetupScreen(
                     RadioButton(
                         selected = selected,
                         onClick = { viewModel.onLanguageChange(lang.code) },
-                        colors = RadioButtonDefaults.colors(
-                            selectedColor = MeshGreen
-                        )
+                        colors = RadioButtonDefaults.colors(selectedColor = MeshGreen)
                     )
                 }
             }
@@ -208,17 +191,12 @@ fun SetupScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Submit button
         Button(
             onClick = viewModel::onSubmit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp),
             enabled = !uiState.isLoading,
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MeshGreen
-            )
+            colors = ButtonDefaults.buttonColors(containerColor = MeshGreen)
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(
@@ -228,7 +206,7 @@ fun SetupScreen(
                 )
             } else {
                 Text(
-                    text = "Get Started",
+                    text = stringResource(R.string.setup_submit),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -238,7 +216,7 @@ fun SetupScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Your info stays on your device. No server, no account.",
+            text = stringResource(R.string.setup_privacy_note),
             fontSize = 11.sp,
             color = MeshMid,
             modifier = Modifier.padding(horizontal = 16.dp)

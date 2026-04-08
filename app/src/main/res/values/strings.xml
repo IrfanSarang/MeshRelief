@@ -1,3 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MeshRelief</string>
+
+    <!-- BottomNavBar -->
+    <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_status">Status</string>
+    <string name="nav_guide">Guide</string>
+
+    <!-- HomeScreen -->
+    <string name="home_mesh_active">Mesh active</string>
+    <string name="home_mesh_scanning">Scanning…</string>
+    <string name="home_peers_connected">%1$d device connected</string>
+    <string name="home_peers_connected_plural">%1$d devices connected</string>
+    <string name="home_no_peers">No peers connected yet</string>
+    <string name="home_sos_button">SOS</string>
+    <string name="home_sos_subtitle">Tap to broadcast emergency alert</string>
+    <string name="home_simulate_sos">Simulate Incoming SOS</string>
+    <string name="home_stat_peers_online">Peers online</string>
+    <string name="home_stat_peers_sublabel">%1$d verified · tap to scan</string>
+    <string name="home_stat_nearby_camps">Nearby camps</string>
+    <string name="home_stat_camps_sublabel">%1$d open</string>
+    <string name="home_bulletin_tag_emergency">Emergency</string>
+    <string name="home_bulletin_tag_relief">Relief</string>
+    <string name="home_bulletin_tag_warning">Warning</string>
+    <string name="home_bulletin_tag_info">Info</string>
+    <string name="home_bulletin_minutes_ago">%1$d min ago</string>
+    <string name="home_bulletin_relay">%1$s · relayed via %2$d hops</string>
+    <string name="home_no_bulletins">No bulletins yet</string>
+    <string name="home_no_bulletins_sub">Bulletins from nearby peers will appear here</string>
+
+    <!-- SOSScreen -->
+    <string name="sos_title">Emergency SOS</string>
+    <string name="sos_triage_label">Set your triage status</string>
+    <string name="sos_button_label">SOS</string>
+    <string name="sos_button_locked">Locked</string>
+    <string name="sos_button_hold">Hold to send</string>
+    <string name="sos_cooldown_label">Next SOS available in</string>
+    <string name="sos_cooldown_remaining">%1$d:%2$02d remaining</string>
+    <string name="sos_sent_title">SOS broadcast sent</string>
+    <string name="sos_sent_sub">All nearby peers have been alerted</string>
+    <string name="sos_dialog_title">Confirm real emergency?</string>
+    <string name="sos_dialog_body">This will alert ALL nearby devices immediately.</string>
+    <string name="sos_dialog_countdown">Auto-cancels in %1$ds</string>
+    <string name="sos_dialog_cancel">Cancel</string>
+    <string name="sos_dialog_confirm">Yes, Send</string>
+
+    <!-- SetupScreen -->
+    <string name="setup_tagline">Offline emergency communication</string>
+    <string name="setup_works_offline">Works without internet</string>
+    <string name="setup_name_label">Your name</string>
+    <string name="setup_name_placeholder">Enter your full name</string>
+    <string name="setup_phone_label">Mobile number</string>
+    <string name="setup_phone_placeholder">10-digit mobile number</string>
+    <string name="setup_language_label">Preferred language</string>
+    <string name="setup_submit">Get Started</string>
+    <string name="setup_privacy_note">Your info stays on your device. No server, no account.</string>
+
+    <!-- LanguageSelectionScreen -->
+    <string name="lang_title">Choose language</string>
+    <string name="lang_step">Step 2 of 2 · You can change this later in settings</string>
+    <string name="lang_helper">Select your preferred language for the app and survival chatbot</string>
+    <string name="lang_info">The survival chatbot will respond in your chosen language. UI labels will also switch automatically.</string>
+    <string name="lang_confirm">Confirm &amp; Start</string>
+
+    <!-- ChatScreen -->
+    <string name="chat_title">Mesh Chat</string>
+    <string name="chat_tab_group">Group</string>
+    <string name="chat_tab_p2p">P2P</string>
+    <string name="chat_group_context">Group · All peers on mesh · relayed to everyone</string>
+    <string name="chat_p2p_hint">Tap a peer to open a private channel</string>
+    <string name="chat_input_group_placeholder">Message all peers…</string>
+    <string name="chat_private_channel">%1$d hop · Private channel</string>
+    <string name="chat_private_channel_plural">%1$d hops · Private channel</string>
+
+    <!-- CampsScreen -->
+    <string name="camps_title">Camps</string>
+    <string name="camps_filter_all">All</string>
+    <string name="camps_filter_active">Active</string>
+    <string name="camps_filter_full">Full</string>
+    <string name="camps_filter_nearby">Nearby</string>
+    <string name="camps_count_one">%1$d camp nearby</string>
+    <string name="camps_count_other">%1$d camps nearby</string>
+    <string name="camps_none_title">No camps found</string>
+    <string name="camps_none_sub">Try a different filter</string>
+    <string name="camps_add_fab">Add camp</string>
+    <string name="camps_card_occupancy">%1$s · %2$d/%3$d people</string>
+    <string name="camps_card_updated">Updated %1$s</string>
+
+    <!-- BulletinScreen -->
+    <string name="bulletin_title">Bulletin Board</string>
+    <string name="bulletin_subtitle">Community notices · mesh broadcast</string>
+    <string name="bulletin_filter_all">All</string>
+    <string name="bulletin_none_title">No bulletins yet</string>
+    <string name="bulletin_none_sub">Tap + to post a notice to the mesh</string>
+    <string name="bulletin_relayed">relayed</string>
+    <string name="bulletin_compose_title">New Bulletin</string>
+    <string name="bulletin_compose_category">Category</string>
+    <string name="bulletin_compose_message">Message</string>
+    <string name="bulletin_compose_placeholder">Type your bulletin (max 280 chars)…</string>
+    <string name="bulletin_broadcast">Broadcast to mesh</string>
+
+    <!-- StatusScreen -->
+    <string name="status_title">Peer Status</string>
+    <string name="status_subtitle">Live · updates every 60s</string>
+    <string name="status_set_my_status">Set my status</string>
+    <string name="status_no_peers_title">No peers connected</string>
+    <string name="status_no_peers_sub">Nearby devices will appear here</string>
+    <string name="status_verified">verified ✓</string>
+    <string name="status_unverified">unverified</string>
+    <string name="status_low_battery">Low battery</string>
+    <string name="status_hop_one">%1$d hop</string>
+    <string name="status_hop_other">%1$d hops</string>
 </resources>

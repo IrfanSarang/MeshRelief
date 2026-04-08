@@ -28,12 +28,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.R
 import com.meshrelief.features.home.BottomNavBar
 import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
@@ -43,8 +45,6 @@ import com.meshrelief.features.home.MeshGreenDark
 import com.meshrelief.features.home.MeshGreenLight
 import com.meshrelief.features.home.MeshMid
 import com.meshrelief.features.home.MeshRed
-
-// ─── Category colour helpers ──────────────────────────────────────────────────
 
 private fun BulletinCategory.accentColor() = when (this) {
     BulletinCategory.EVACUATION -> MeshRed
@@ -59,8 +59,6 @@ private fun BulletinCategory.bgColor() = when (this) {
     BulletinCategory.RESOURCES  -> MeshGreenLight
     BulletinCategory.GENERAL    -> Color(0xFFF4F3F0)
 }
-
-// ─── Screen entry point ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,9 +79,7 @@ fun BulletinScreen(
 
     Scaffold(
         containerColor = MeshGray,
-        topBar = {
-            BulletinTopBar(onBack = onBack)
-        },
+        topBar = { BulletinTopBar(onBack = onBack) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.openSheet() },
@@ -92,7 +88,7 @@ fun BulletinScreen(
                 shape = CircleShape,
                 modifier = Modifier.padding(bottom = 64.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Post bulletin")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bulletin_compose_title))
             }
         },
         bottomBar = {
@@ -106,40 +102,25 @@ fun BulletinScreen(
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Category filter chips
-            BulletinFilterRow(
-                selected = state.selectedFilter,
-                onSelect = { viewModel.setFilter(it) }
-            )
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            BulletinFilterRow(selected = state.selectedFilter, onSelect = { viewModel.setFilter(it) })
 
-            // Feed or empty state
             if (displayList.isEmpty()) {
                 BulletinEmptyState(modifier = Modifier.weight(1f))
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(displayList, key = { it.id }) { item ->
-                        BulletinCard(
-                            item = item,
-                            relativeTime = viewModel.relativeTime(item.timestampMillis)
-                        )
+                        BulletinCard(item = item, relativeTime = viewModel.relativeTime(item.timestampMillis))
                     }
                 }
             }
         }
     }
 
-    // Compose bottom sheet
     if (state.isSheetOpen) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.closeSheet() },
@@ -167,14 +148,9 @@ fun BulletinScreen(
     }
 }
 
-// ─── Top bar ──────────────────────────────────────────────────────────────────
-
 @Composable
 private fun BulletinTopBar(onBack: () -> Unit) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 1.dp
-    ) {
+    Surface(color = Color.White, shadowElevation = 1.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -185,32 +161,23 @@ private fun BulletinTopBar(onBack: () -> Unit) {
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeshGray)
+                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(MeshGray)
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MeshMid,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = MeshMid, modifier = Modifier.size(18.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Bulletin Board",
+                    text = stringResource(R.string.bulletin_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MeshDark
                 )
                 Text(
-                    text = "Community notices · mesh broadcast",
+                    text = stringResource(R.string.bulletin_subtitle),
                     fontSize = 10.sp,
                     color = MeshMid
                 )
             }
-            // Megaphone icon (drawn)
             MegaphoneIcon(tint = MeshGreen)
         }
     }
@@ -221,10 +188,6 @@ private fun MegaphoneIcon(tint: Color) {
     Canvas(modifier = Modifier.size(22.dp)) {
         val w = size.width
         val h = size.height
-        val paint = androidx.compose.ui.graphics.Paint().apply {
-            color = tint
-        }
-        // Simple megaphone body
         val path = Path().apply {
             moveTo(w * 0.55f, h * 0.25f)
             lineTo(w * 0.18f, h * 0.38f)
@@ -233,34 +196,19 @@ private fun MegaphoneIcon(tint: Color) {
             close()
         }
         drawPath(path, color = tint)
-        // Bell mouth
         drawArc(
             color = tint,
-            startAngle = -65f,
-            sweepAngle = 130f,
-            useCenter = false,
+            startAngle = -65f, sweepAngle = 130f, useCenter = false,
             topLeft = Offset(w * 0.48f, h * 0.15f),
             size = androidx.compose.ui.geometry.Size(w * 0.38f, h * 0.70f),
             style = Stroke(width = 2.2f, cap = StrokeCap.Round)
         )
-        // Handle
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.26f, h * 0.62f),
-            end = Offset(w * 0.26f, h * 0.80f),
-            strokeWidth = 2.2f,
-            cap = StrokeCap.Round
-        )
+        drawLine(color = tint, start = Offset(w * 0.26f, h * 0.62f), end = Offset(w * 0.26f, h * 0.80f), strokeWidth = 2.2f, cap = StrokeCap.Round)
     }
 }
 
-// ─── Filter chip row ──────────────────────────────────────────────────────────
-
 @Composable
-private fun BulletinFilterRow(
-    selected: BulletinCategory?,
-    onSelect: (BulletinCategory?) -> Unit
-) {
+private fun BulletinFilterRow(selected: BulletinCategory?, onSelect: (BulletinCategory?) -> Unit) {
     Surface(color = Color.White, shadowElevation = 0.5.dp) {
         Row(
             modifier = Modifier
@@ -269,7 +217,11 @@ private fun BulletinFilterRow(
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            FilterChip(label = "All", isSelected = selected == null, onClick = { onSelect(null) })
+            FilterChip(
+                label = stringResource(R.string.bulletin_filter_all),
+                isSelected = selected == null,
+                onClick = { onSelect(null) }
+            )
             BulletinCategory.values().forEach { cat ->
                 FilterChip(
                     label = cat.label,
@@ -283,12 +235,7 @@ private fun BulletinFilterRow(
 }
 
 @Composable
-private fun FilterChip(
-    label: String,
-    isSelected: Boolean,
-    accentColor: Color = MeshGreen,
-    onClick: () -> Unit
-) {
+private fun FilterChip(label: String, isSelected: Boolean, accentColor: Color = MeshGreen, onClick: () -> Unit) {
     val bg = if (isSelected) accentColor.copy(alpha = 0.12f) else Color.White
     val border = if (isSelected) accentColor else Color(0xFFD3D1C7)
     val textColor = if (isSelected) accentColor else MeshMid
@@ -298,9 +245,6 @@ private fun FilterChip(
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .border(0.5.dp, border, RoundedCornerShape(20.dp))
-            .then(
-                Modifier.padding(0.dp) // clickable handled below
-            )
     ) {
         TextButton(
             onClick = onClick,
@@ -312,13 +256,8 @@ private fun FilterChip(
     }
 }
 
-// ─── Bulletin card ────────────────────────────────────────────────────────────
-
 @Composable
-private fun BulletinCard(
-    item: BulletinItem,
-    relativeTime: String
-) {
+private fun BulletinCard(item: BulletinItem, relativeTime: String) {
     val isPinned = item.category == BulletinCategory.EVACUATION
 
     Row(
@@ -328,78 +267,33 @@ private fun BulletinCard(
             .background(Color.White)
             .border(0.5.dp, Color(0xFFEAE9E3), RoundedCornerShape(12.dp))
     ) {
-        // Category accent left border
         Box(
             modifier = Modifier
                 .width(4.dp)
                 .fillMaxHeight()
-                .background(
-                    item.category.accentColor(),
-                    RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
-                )
+                .background(item.category.accentColor(), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
         )
-
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 11.dp, end = 11.dp, top = 10.dp, bottom = 10.dp),
+            modifier = Modifier.weight(1f).padding(start = 11.dp, end = 11.dp, top = 10.dp, bottom = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Header row: category chip + pin icon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CategoryTag(category = item.category)
-                if (isPinned) {
-                    PinIcon(tint = MeshRed)
-                }
+                if (isPinned) PinIcon(tint = MeshRed)
                 Spacer(modifier = Modifier.weight(1f))
-                if (item.isRelayed) {
-                    RelayedIcon()
-                }
+                if (item.isRelayed) RelayedIcon()
             }
-
-            // Message body
-            Text(
-                text = item.message,
-                fontSize = 12.sp,
-                color = MeshDark,
-                lineHeight = 17.sp,
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            // Footer: sender + time
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Avatar initials
+            Text(text = item.message, fontSize = 12.sp, color = MeshDark, lineHeight = 17.sp, maxLines = 5, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val initials = item.senderName.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("")
                 Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(item.category.accentColor().copy(alpha = 0.18f)),
+                    modifier = Modifier.size(18.dp).clip(CircleShape).background(item.category.accentColor().copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(initials, fontSize = 7.sp, color = item.category.accentColor(), fontWeight = FontWeight.Bold)
                 }
-                Text(
-                    text = item.senderName,
-                    fontSize = 10.sp,
-                    color = MeshMid,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = relativeTime,
-                    fontSize = 9.sp,
-                    color = Color(0xFFAAAAAA)
-                )
+                Text(text = item.senderName, fontSize = 10.sp, color = MeshMid, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = relativeTime, fontSize = 9.sp, color = Color(0xFFAAAAAA))
             }
         }
     }
@@ -414,21 +308,14 @@ private fun CategoryTag(category: BulletinCategory) {
             .border(0.5.dp, category.accentColor().copy(alpha = 0.35f), RoundedCornerShape(20.dp))
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
-        Text(
-            text = category.label.uppercase(),
-            fontSize = 8.sp,
-            color = category.accentColor(),
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp
-        )
+        Text(text = category.label.uppercase(), fontSize = 8.sp, color = category.accentColor(), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
     }
 }
 
 @Composable
 private fun PinIcon(tint: Color) {
     Canvas(modifier = Modifier.size(12.dp)) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
+        val cx = size.width / 2f; val cy = size.height / 2f
         drawCircle(color = tint, radius = cx * 0.7f, center = Offset(cx, cy))
         drawLine(color = tint, start = Offset(cx, cy + cx * 0.7f), end = Offset(cx, size.height), strokeWidth = 1.5f, cap = StrokeCap.Round)
     }
@@ -436,20 +323,13 @@ private fun PinIcon(tint: Color) {
 
 @Composable
 private fun RelayedIcon() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        // Simple antenna/wifi arcs
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         Canvas(modifier = Modifier.size(12.dp)) {
-            val cx = size.width / 2f
-            val cy = size.height * 0.65f
+            val cx = size.width / 2f; val cy = size.height * 0.65f
             listOf(0.85f, 0.55f, 0.30f).forEachIndexed { i, radius ->
                 drawArc(
                     color = MeshGreen.copy(alpha = 0.8f - i * 0.15f),
-                    startAngle = 200f,
-                    sweepAngle = 140f,
-                    useCenter = false,
+                    startAngle = 200f, sweepAngle = 140f, useCenter = false,
                     topLeft = Offset(cx - size.width * radius, cy - size.height * radius),
                     size = androidx.compose.ui.geometry.Size(size.width * radius * 2, size.height * radius * 2),
                     style = Stroke(width = 1.2f, cap = StrokeCap.Round)
@@ -457,11 +337,9 @@ private fun RelayedIcon() {
             }
             drawCircle(color = MeshGreen, radius = 1.2f, center = Offset(cx, cy))
         }
-        Text("relayed", fontSize = 8.sp, color = MeshGreen)
+        Text(stringResource(R.string.bulletin_relayed), fontSize = 8.sp, color = MeshGreen)
     }
 }
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun BulletinEmptyState(modifier: Modifier = Modifier) {
@@ -470,66 +348,28 @@ private fun BulletinEmptyState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Canvas megaphone illustration
         Canvas(modifier = Modifier.size(80.dp)) {
-            val w = size.width
-            val h = size.height
-
-            // Body
+            val w = size.width; val h = size.height
             val bodyPath = Path().apply {
-                moveTo(w * 0.58f, h * 0.22f)
-                lineTo(w * 0.20f, h * 0.38f)
-                lineTo(w * 0.20f, h * 0.65f)
-                lineTo(w * 0.58f, h * 0.78f)
-                close()
+                moveTo(w * 0.58f, h * 0.22f); lineTo(w * 0.20f, h * 0.38f)
+                lineTo(w * 0.20f, h * 0.65f); lineTo(w * 0.58f, h * 0.78f); close()
             }
             drawPath(bodyPath, color = MeshGreen.copy(alpha = 0.15f))
             drawPath(bodyPath, color = MeshGreen.copy(alpha = 0.5f), style = Stroke(width = 2.5f, cap = StrokeCap.Round))
-
-            // Bell mouth
-            drawArc(
-                color = MeshGreen.copy(alpha = 0.5f),
-                startAngle = -70f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(w * 0.50f, h * 0.12f),
-                size = androidx.compose.ui.geometry.Size(w * 0.40f, h * 0.76f),
-                style = Stroke(width = 2.5f, cap = StrokeCap.Round)
-            )
-
-            // Handle / stick
-            drawLine(
-                color = MeshGreen.copy(alpha = 0.5f),
-                start = Offset(w * 0.28f, h * 0.65f),
-                end = Offset(w * 0.28f, h * 0.84f),
-                strokeWidth = 2.5f,
-                cap = StrokeCap.Round
-            )
-
-            // Sound waves (right)
+            drawArc(color = MeshGreen.copy(alpha = 0.5f), startAngle = -70f, sweepAngle = 140f, useCenter = false,
+                topLeft = Offset(w * 0.50f, h * 0.12f), size = androidx.compose.ui.geometry.Size(w * 0.40f, h * 0.76f),
+                style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+            drawLine(color = MeshGreen.copy(alpha = 0.5f), start = Offset(w * 0.28f, h * 0.65f), end = Offset(w * 0.28f, h * 0.84f), strokeWidth = 2.5f, cap = StrokeCap.Round)
             listOf(0.78f, 0.88f).forEach { rx ->
-                drawLine(
-                    color = MeshGreen.copy(alpha = 0.3f),
-                    start = Offset(w * rx, h * 0.40f),
-                    end = Offset(w * rx, h * 0.60f),
-                    strokeWidth = 2f,
-                    cap = StrokeCap.Round
-                )
+                drawLine(color = MeshGreen.copy(alpha = 0.3f), start = Offset(w * rx, h * 0.40f), end = Offset(w * rx, h * 0.60f), strokeWidth = 2f, cap = StrokeCap.Round)
             }
         }
-
         Spacer(modifier = Modifier.height(14.dp))
-        Text("No bulletins yet", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MeshDark)
+        Text(stringResource(R.string.bulletin_none_title), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MeshDark)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Tap + to post a notice to the mesh",
-            fontSize = 12.sp,
-            color = MeshMid
-        )
+        Text(stringResource(R.string.bulletin_none_sub), fontSize = 12.sp, color = MeshMid)
     }
 }
-
-// ─── Compose bottom sheet ─────────────────────────────────────────────────────
 
 @Composable
 private fun ComposeSheet(
@@ -540,17 +380,13 @@ private fun ComposeSheet(
     onDismiss: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("New Bulletin", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MeshDark)
+        Text(stringResource(R.string.bulletin_compose_title), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MeshDark)
 
-        // Category selector
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Category", fontSize = 11.sp, color = MeshMid)
+            Text(stringResource(R.string.bulletin_compose_category), fontSize = 11.sp, color = MeshMid)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -567,28 +403,18 @@ private fun ComposeSheet(
                             onClick = { onCategorySelect(cat) },
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 5.dp)
                         ) {
-                            Text(
-                                cat.label,
-                                fontSize = 11.sp,
-                                color = if (isSelected) Color.White else cat.accentColor(),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(cat.label, fontSize = 11.sp, color = if (isSelected) Color.White else cat.accentColor(), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
         }
 
-        // Text field
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Message", fontSize = 11.sp, color = MeshMid)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.bulletin_compose_message), fontSize = 11.sp, color = MeshMid)
                 Text("${state.composeText.length}/280", fontSize = 10.sp, color = if (state.composeText.length > 250) MeshRed else MeshMid)
             }
-
             BasicTextField(
                 value = state.composeText,
                 onValueChange = onTextChange,
@@ -600,39 +426,24 @@ private fun ComposeSheet(
                     .border(0.5.dp, Color(0xFFD3D1C7), RoundedCornerShape(10.dp))
                     .padding(12.dp)
                     .heightIn(min = 90.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 13.sp,
-                    color = MeshDark,
-                    lineHeight = 19.sp
-                ),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = MeshDark, lineHeight = 19.sp),
                 decorationBox = { innerTextField ->
                     if (state.composeText.isEmpty()) {
-                        Text(
-                            "Type your bulletin (max 280 chars)…",
-                            fontSize = 13.sp,
-                            color = MeshMid.copy(alpha = 0.6f),
-                            lineHeight = 19.sp
-                        )
+                        Text(stringResource(R.string.bulletin_compose_placeholder), fontSize = 13.sp, color = MeshMid.copy(alpha = 0.6f), lineHeight = 19.sp)
                     }
                     innerTextField()
                 }
             )
         }
 
-        // Broadcast button
         Button(
             onClick = onBroadcast,
             enabled = state.composeText.trim().isNotBlank(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MeshGreen,
-                disabledContainerColor = Color(0xFFD3D1C7)
-            ),
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MeshGreen, disabledContainerColor = Color(0xFFD3D1C7)),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Broadcast to mesh", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.bulletin_broadcast), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(modifier = Modifier.height(6.dp))

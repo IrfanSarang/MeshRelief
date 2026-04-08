@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MeshRelief</string>
+
+    <!-- BottomNavBar -->
+    <string name="nav_home">ہوم</string>
+    <string name="nav_chat">چیٹ</string>
+    <string name="nav_map">نقشہ</string>
+    <string name="nav_status">حیثیت</string>
+    <string name="nav_guide">رہنما</string>
+
+    <!-- HomeScreen -->
+    <string name="home_mesh_active">میش فعال</string>
+    <string name="home_mesh_scanning">اسکیننگ…</string>
+    <string name="home_peers_connected">%1$d ڈیوائس جڑی ہوئی ہے</string>
+    <string name="home_peers_connected_plural">%1$d ڈیوائسز جڑی ہوئی ہیں</string>
+    <string name="home_no_peers">ابھی کوئی پیئر نہیں جڑا</string>
+    <string name="home_sos_button">SOS</string>
+    <string name="home_sos_subtitle">ہنگامی اطلاع بھیجنے کے لیے ٹیپ کریں</string>
+    <string name="home_simulate_sos">آنے والا SOS سمیولیٹ کریں</string>
+    <string name="home_stat_peers_online">پیئر آن لائن</string>
+    <string name="home_stat_peers_sublabel">%1$d تصدیق شدہ · اسکین کے لیے ٹیپ کریں</string>
+    <string name="home_stat_nearby_camps">قریبی کیمپ</string>
+    <string name="home_stat_camps_sublabel">%1$d کھلے</string>
+    <string name="home_bulletin_tag_emergency">ہنگامی صورتحال</string>
+    <string name="home_bulletin_tag_relief">امداد</string>
+    <string name="home_bulletin_tag_warning">تنبیہ</string>
+    <string name="home_bulletin_tag_info">معلومات</string>
+    <string name="home_bulletin_minutes_ago">%1$d منٹ پہلے</string>
+    <string name="home_bulletin_relay">%1$s · %2$d ہاپس کے ذریعے ریلے</string>
+    <string name="home_no_bulletins">ابھی کوئی بلیٹن نہیں</string>
+    <string name="home_no_bulletins_sub">قریبی پیئرز کے بلیٹن یہاں ظاہر ہوں گے</string>
+
+    <!-- SOSScreen -->
+    <string name="sos_title">ہنگامی SOS</string>
+    <string name="sos_triage_label">اپنی ٹرائیج حیثیت مقرر کریں</string>
+    <string name="sos_button_label">SOS</string>
+    <string name="sos_button_locked">مقفل</string>
+    <string name="sos_button_hold">بھیجنے کے لیے دبائیں</string>
+    <string name="sos_cooldown_label">اگلا SOS دستیاب ہوگا</string>
+    <string name="sos_cooldown_remaining">%1$d:%2$02d باقی</string>
+    <string name="sos_sent_title">SOS نشریہ بھیج دیا گیا</string>
+    <string name="sos_sent_sub">تمام قریبی پیئرز کو آگاہ کر دیا گیا</string>
+    <string name="sos_dialog_title">کیا یہ واقعی ہنگامی صورتحال ہے؟</string>
+    <string name="sos_dialog_body">یہ فوری طور پر تمام قریبی ڈیوائسز کو الرٹ کرے گا۔</string>
+    <string name="sos_dialog_countdown">%1$d سیکنڈ میں خودکار منسوخ ہوگا</string>
+    <string name="sos_dialog_cancel">منسوخ کریں</string>
+    <string name="sos_dialog_confirm">ہاں، بھیجیں</string>
+
+    <!-- SetupScreen -->
+    <string name="setup_tagline">آف لائن ہنگامی رابطہ</string>
+    <string name="setup_works_offline">انٹرنیٹ کے بغیر کام کرتا ہے</string>
+    <string name="setup_name_label">آپ کا نام</string>
+    <string name="setup_name_placeholder">پورا نام درج کریں</string>
+    <string name="setup_phone_label">موبائل نمبر</string>
+    <string name="setup_phone_placeholder">10 ہندسوں کا موبائل نمبر</string>
+    <string name="setup_language_label">پسندیدہ زبان</string>
+    <string name="setup_submit">شروع کریں</string>
+    <string name="setup_privacy_note">آپ کی معلومات آپ کی ڈیوائس پر رہتی ہیں۔ کوئی سرور نہیں، کوئی اکاؤنٹ نہیں۔</string>
+
+    <!-- LanguageSelectionScreen -->
+    <string name="lang_title">زبان منتخب کریں</string>
+    <string name="lang_step">مرحلہ 2 از 2 · آپ اسے بعد میں سیٹنگز میں تبدیل کر سکتے ہیں</string>
+    <string name="lang_helper">ایپ اور سروائیول چیٹ بوٹ کے لیے اپنی پسندیدہ زبان منتخب کریں</string>
+    <string name="lang_info">سروائیول چیٹ بوٹ آپ کی منتخب زبان میں جواب دے گا۔ UI لیبلز بھی خودکار تبدیل ہو جائیں گے۔</string>
+    <string name="lang_confirm">تصدیق کریں اور شروع کریں</string>
+
+    <!-- ChatScreen -->
+    <string name="chat_title">میش چیٹ</string>
+    <string name="chat_tab_group">گروپ</string>
+    <string name="chat_tab_p2p">P2P</string>
+    <string name="chat_group_context">گروپ · میش پر تمام پیئرز · سب کو ریلے</string>
+    <string name="chat_p2p_hint">نجی چینل کھولنے کے لیے پیئر پر ٹیپ کریں</string>
+    <string name="chat_input_group_placeholder">تمام پیئرز کو پیغام…</string>
+    <string name="chat_private_channel">%1$d ہاپ · نجی چینل</string>
+    <string name="chat_private_channel_plural">%1$d ہاپس · نجی چینل</string>
+
+    <!-- CampsScreen -->
+    <string name="camps_title">کیمپ</string>
+    <string name="camps_filter_all">سب</string>
+    <string name="camps_filter_active">فعال</string>
+    <string name="camps_filter_full">بھرا ہوا</string>
+    <string name="camps_filter_nearby">قریبی</string>
+    <string name="camps_count_one">%1$d کیمپ قریب</string>
+    <string name="camps_count_other">%1$d کیمپ قریب</string>
+    <string name="camps_none_title">کوئی کیمپ نہیں ملا</string>
+    <string name="camps_none_sub">کوئی اور فلٹر آزمائیں</string>
+    <string name="camps_add_fab">کیمپ شامل کریں</string>
+    <string name="camps_card_occupancy">%1$s · %2$d/%3$d افراد</string>
+    <string name="camps_card_updated">%1$s کو اپ ڈیٹ کیا</string>
+
+    <!-- BulletinScreen -->
+    <string name="bulletin_title">بلیٹن بورڈ</string>
+    <string name="bulletin_subtitle">اجتماعی اطلاعات · میش نشریہ</string>
+    <string name="bulletin_filter_all">سب</string>
+    <string name="bulletin_none_title">ابھی کوئی بلیٹن نہیں</string>
+    <string name="bulletin_none_sub">میش پر نوٹس پوسٹ کرنے کے لیے + دبائیں</string>
+    <string name="bulletin_relayed">ریلے کیا گیا</string>
+    <string name="bulletin_compose_title">نیا بلیٹن</string>
+    <string name="bulletin_compose_category">زمرہ</string>
+    <string name="bulletin_compose_message">پیغام</string>
+    <string name="bulletin_compose_placeholder">اپنا بلیٹن ٹائپ کریں (زیادہ سے زیادہ 280 حروف)…</string>
+    <string name="bulletin_broadcast">میش پر نشر کریں</string>
+
+    <!-- StatusScreen -->
+    <string name="status_title">پیئر کی حیثیت</string>
+    <string name="status_subtitle">لائیو · ہر 60 سیکنڈ میں اپ ڈیٹ</string>
+    <string name="status_set_my_status">میری حیثیت مقرر کریں</string>
+    <string name="status_no_peers_title">کوئی پیئر نہیں جڑا</string>
+    <string name="status_no_peers_sub">قریبی ڈیوائسز یہاں ظاہر ہوں گی</string>
+    <string name="status_verified">تصدیق شدہ ✓</string>
+    <string name="status_unverified">غیر تصدیق شدہ</string>
+    <string name="status_low_battery">بیٹری کم ہے</string>
+    <string name="status_hop_one">%1$d ہاپ</string>
+    <string name="status_hop_other">%1$d ہاپس</string>
+</resources>

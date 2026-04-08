@@ -1,18 +1,18 @@
 package com.meshrelief.features.map
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.location.LocationProvider
 import com.meshrelief.core.model.TriageStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 
 // ── Data models ──────────────────────────────────────────────────────────────
-
-// TriageStatus is now com.meshrelief.core.model.TriageStatus (GREEN, AMBER, RED, UNKNOWN).
-// The local enum class has been removed.
 
 data class PeerMapMarker(
     val id: String,
@@ -41,14 +41,14 @@ data class MapUiState(
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
-class MapViewModel @Inject constructor() : ViewModel() {
+class MapViewModel @Inject constructor(
+    private val locationProvider: LocationProvider
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
-    // Mumbai disaster scenario sample data
-    private val sampleUserLocation = GeoPoint(19.0760, 72.8777)
-
+    // Stub peer/camp data — real data wired in Issue #4/#5
     private val samplePeers = listOf(
         PeerMapMarker(
             id = "peer_001",
@@ -119,12 +119,26 @@ class MapViewModel @Inject constructor() : ViewModel() {
     )
 
     init {
+        // Seed stub data immediately so the map isn't empty while locating
         _uiState.value = MapUiState(
-            userLocation = sampleUserLocation,
             peers = samplePeers,
             camps = sampleCamps,
-            isLocating = false,
-            showLegend = false
+            isLocating = true
+        )
+        viewModelScope.launch { refreshLocation() }
+    }
+
+    /**
+     * Asks LocationProvider for the best available fix and updates uiState.
+     * If no fix is available the previous userLocation is kept (null on first
+     * launch) so the map can still show peers/camps without a user pin.
+     */
+    suspend fun refreshLocation() {
+        _uiState.value = _uiState.value.copy(isLocating = true)
+        val fix = locationProvider.getLastKnownLocation()
+        _uiState.value = _uiState.value.copy(
+            userLocation = fix ?: _uiState.value.userLocation,
+            isLocating = false
         )
     }
 
@@ -133,8 +147,7 @@ class MapViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onRecenterRequested() {
-        // In production: trigger GPS re-fetch here
-        // For now, the FAB click in the screen handles map camera move directly
+        viewModelScope.launch { refreshLocation() }
     }
 
     val peerCount: Int get() = _uiState.value.peers.size

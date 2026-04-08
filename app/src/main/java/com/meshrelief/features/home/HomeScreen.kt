@@ -14,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.R
 
 val MeshGreen = Color(0xFF1D9E75)
 val MeshGreenLight = Color(0xFFE1F5EE)
@@ -37,7 +39,8 @@ fun HomeScreen(
     onChatbotClick: () -> Unit,
     onDiscoveryClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
-    onCampsClick: () -> Unit
+    onCampsClick: () -> Unit,
+    onFakeIncomingSos: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -60,30 +63,32 @@ fun HomeScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
-
-            // ── Header ──────────────────────────────────────
             HomeHeader(
                 meshActive = uiState.meshActive,
                 peersOnline = uiState.peersOnline
             )
 
-            // ── Content ─────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-
-                // SOS Button
                 SOSButton(onClick = onSOSClick)
 
-                // Stats row
+                // DEV_ONLY — remove before production
+                Button(
+                    onClick = onFakeIncomingSos,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeshAmber)
+                ) {
+                    Text(stringResource(R.string.home_simulate_sos), color = Color.White)
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Peers online card — tappable, opens Discovery screen
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -92,21 +97,20 @@ fun HomeScreen(
                     ) {
                         StatCard(
                             modifier = Modifier.fillMaxWidth(),
-                            label = "Peers online",
+                            label = stringResource(R.string.home_stat_peers_online),
                             value = uiState.peersOnline.toString(),
-                            subLabel = "${uiState.verifiedPeers} verified · tap to scan"
+                            subLabel = stringResource(R.string.home_stat_peers_sublabel, uiState.verifiedPeers)
                         )
                     }
 
                     StatCard(
                         modifier = Modifier.weight(1f),
-                        label = "Nearby camps",
+                        label = stringResource(R.string.home_stat_nearby_camps),
                         value = uiState.nearbyCamps.toString(),
-                        subLabel = "${uiState.openCamps} open"
+                        subLabel = stringResource(R.string.home_stat_camps_sublabel, uiState.openCamps)
                     )
                 }
 
-                // Bulletin preview
                 if (uiState.latestBulletin != null) {
                     BulletinCard(bulletin = uiState.latestBulletin!!)
                 } else {
@@ -139,13 +143,12 @@ fun HomeHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "MeshRelief",
+                text = stringResource(R.string.app_name),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MeshDark
             )
 
-            // Mesh status badge
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
@@ -161,7 +164,8 @@ fun HomeHeader(
                         .background(if (meshActive) MeshGreen else Color(0xFFB4B2A9))
                 )
                 Text(
-                    text = if (meshActive) "Mesh active" else "Scanning...",
+                    text = if (meshActive) stringResource(R.string.home_mesh_active)
+                    else stringResource(R.string.home_mesh_scanning),
                     fontSize = 11.sp,
                     color = if (meshActive) MeshGreenDark else MeshMid,
                     fontWeight = FontWeight.Medium
@@ -172,10 +176,11 @@ fun HomeHeader(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = if (peersOnline > 0)
-                "$peersOnline device${if (peersOnline > 1) "s" else ""} connected"
-            else
-                "No peers connected yet",
+            text = when {
+                peersOnline == 1 -> stringResource(R.string.home_peers_connected, peersOnline)
+                peersOnline > 1  -> stringResource(R.string.home_peers_connected_plural, peersOnline)
+                else             -> stringResource(R.string.home_no_peers)
+            },
             fontSize = 11.sp,
             color = MeshMid
         )
@@ -190,19 +195,17 @@ fun SOSButton(onClick: () -> Unit) {
             .fillMaxWidth()
             .height(64.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MeshRed
-        )
+        colors = ButtonDefaults.buttonColors(containerColor = MeshRed)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "SOS",
+                text = stringResource(R.string.home_sos_button),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
             Text(
-                text = "Tap to broadcast emergency alert",
+                text = stringResource(R.string.home_sos_subtitle),
                 fontSize = 10.sp,
                 color = Color.White.copy(alpha = 0.85f)
             )
@@ -223,22 +226,9 @@ fun StatCard(
             .background(MeshGray)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = MeshMid
-        )
-        Text(
-            text = value,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Medium,
-            color = MeshDark
-        )
-        Text(
-            text = subLabel,
-            fontSize = 10.sp,
-            color = MeshMid
-        )
+        Text(text = label, fontSize = 10.sp, color = MeshMid)
+        Text(text = value, fontSize = 22.sp, fontWeight = FontWeight.Medium, color = MeshDark)
+        Text(text = subLabel, fontSize = 10.sp, color = MeshMid)
     }
 }
 
@@ -251,10 +241,10 @@ fun BulletinCard(bulletin: BulletinPreview) {
         else        -> Color(0xFF378ADD)
     }
     val tagText = when (bulletin.type) {
-        "EMERGENCY" -> "Emergency"
-        "RELIEF"    -> "Relief"
-        "WARNING"   -> "Warning"
-        else        -> "Info"
+        "EMERGENCY" -> stringResource(R.string.home_bulletin_tag_emergency)
+        "RELIEF"    -> stringResource(R.string.home_bulletin_tag_relief)
+        "WARNING"   -> stringResource(R.string.home_bulletin_tag_warning)
+        else        -> stringResource(R.string.home_bulletin_tag_info)
     }
 
     Column(
@@ -276,35 +266,23 @@ fun BulletinCard(bulletin: BulletinPreview) {
                     .height(80.dp)
                     .background(borderColor)
             )
-            Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    Text(text = tagText, fontSize = 10.sp, color = borderColor, fontWeight = FontWeight.Medium)
                     Text(
-                        text = tagText,
-                        fontSize = 10.sp,
-                        color = borderColor,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "${bulletin.minutesAgo} min ago",
+                        text = stringResource(R.string.home_bulletin_minutes_ago, bulletin.minutesAgo),
                         fontSize = 10.sp,
                         color = Color(0xFFAAAAAA)
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = bulletin.content,
-                    fontSize = 12.sp,
-                    color = MeshDark,
-                    fontWeight = FontWeight.Medium
-                )
+                Text(text = bulletin.content, fontSize = 12.sp, color = MeshDark, fontWeight = FontWeight.Medium)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${bulletin.senderName} · relayed via ${bulletin.relayCount} hops",
+                    text = stringResource(R.string.home_bulletin_relay, bulletin.senderName, bulletin.relayCount),
                     fontSize = 10.sp,
                     color = Color(0xFFAAAAAA)
                 )
@@ -323,16 +301,8 @@ fun EmptyBulletinCard() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "No bulletins yet",
-            fontSize = 12.sp,
-            color = MeshMid
-        )
-        Text(
-            text = "Bulletins from nearby peers will appear here",
-            fontSize = 11.sp,
-            color = Color(0xFFAAAAAA)
-        )
+        Text(text = stringResource(R.string.home_no_bulletins), fontSize = 12.sp, color = MeshMid)
+        Text(text = stringResource(R.string.home_no_bulletins_sub), fontSize = 11.sp, color = Color(0xFFAAAAAA))
     }
 }
 
@@ -348,16 +318,13 @@ fun BottomNavBar(
     NavigationBar(
         containerColor = Color.White,
         tonalElevation = 0.dp,
-        modifier = Modifier.border(
-            width = 0.5.dp,
-            color = Color(0xFFEEEEEE)
-        )
+        modifier = Modifier.border(width = 0.5.dp, color = Color(0xFFEEEEEE))
     ) {
         NavigationBarItem(
             selected = currentRoute == "home",
             onClick = onHomeClick,
             icon = { Text(text = "⌂", fontSize = 18.sp) },
-            label = { Text("Home", fontSize = 10.sp) },
+            label = { Text(stringResource(R.string.nav_home), fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeshGreen,
                 selectedTextColor = MeshGreen,
@@ -368,7 +335,7 @@ fun BottomNavBar(
             selected = currentRoute == "chat",
             onClick = onChatClick,
             icon = { Text(text = "✉", fontSize = 18.sp) },
-            label = { Text("Chat", fontSize = 10.sp) },
+            label = { Text(stringResource(R.string.nav_chat), fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeshGreen,
                 selectedTextColor = MeshGreen,
@@ -379,7 +346,7 @@ fun BottomNavBar(
             selected = currentRoute == "map",
             onClick = onMapClick,
             icon = { Text(text = "◎", fontSize = 18.sp) },
-            label = { Text("Map", fontSize = 10.sp) },
+            label = { Text(stringResource(R.string.nav_map), fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeshGreen,
                 selectedTextColor = MeshGreen,
@@ -390,7 +357,7 @@ fun BottomNavBar(
             selected = currentRoute == "status",
             onClick = onStatusClick,
             icon = { Text(text = "◉", fontSize = 18.sp) },
-            label = { Text("Status", fontSize = 10.sp) },
+            label = { Text(stringResource(R.string.nav_status), fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeshGreen,
                 selectedTextColor = MeshGreen,
@@ -401,7 +368,7 @@ fun BottomNavBar(
             selected = currentRoute == "chatbot",
             onClick = onChatbotClick,
             icon = { Text(text = "⊕", fontSize = 18.sp) },
-            label = { Text("Guide", fontSize = 10.sp) },
+            label = { Text(stringResource(R.string.nav_guide), fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeshGreen,
                 selectedTextColor = MeshGreen,

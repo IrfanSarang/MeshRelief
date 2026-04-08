@@ -19,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.R
 import com.meshrelief.features.home.BottomNavBar
 import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
@@ -36,10 +38,6 @@ import com.meshrelief.features.home.MeshRed
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Entry point — routes between peer list and active P2P conversation
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 fun ChatScreen(
     onHomeClick: () -> Unit,
@@ -51,7 +49,6 @@ fun ChatScreen(
     val selectedPeer by viewModel.selectedPeer.collectAsState()
 
     if (selectedPeer != null) {
-        // P2P conversation — hide bottom nav (immersive chat)
         P2PChatConversationScreen(
             peer = selectedPeer!!,
             viewModel = viewModel,
@@ -67,10 +64,6 @@ fun ChatScreen(
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab host: Group Chat | P2P Chat
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ChatTabsScreen(
@@ -90,9 +83,9 @@ private fun ChatTabsScreen(
 
     Scaffold(
         bottomBar = {
-            com.meshrelief.features.home.BottomNavBar(
+            BottomNavBar(
                 onHomeClick = onHomeClick,
-                onChatClick = {},          // already on Chat
+                onChatClick = {},
                 onMapClick = onMapClick,
                 onStatusClick = onStatusClick,
                 onChatbotClick = onChatbotClick,
@@ -107,7 +100,6 @@ private fun ChatTabsScreen(
                 .padding(padding)
                 .background(Color.White)
         ) {
-            // ── Header ────────────────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -120,14 +112,13 @@ private fun ChatTabsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Mesh Chat",
+                        text = stringResource(R.string.chat_title),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = MeshDark
                     )
                 }
 
-                // Tabs
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -136,14 +127,14 @@ private fun ChatTabsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ChatTab(
-                        label = "Group",
+                        label = stringResource(R.string.chat_tab_group),
                         unread = unreadGroup,
                         selected = selectedTab == 0,
                         modifier = Modifier.weight(1f)
                     ) { selectedTab = 0 }
 
                     ChatTab(
-                        label = "P2P",
+                        label = stringResource(R.string.chat_tab_p2p),
                         unread = unreadP2p,
                         selected = selectedTab == 1,
                         modifier = Modifier.weight(1f)
@@ -153,7 +144,6 @@ private fun ChatTabsScreen(
                 HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
             }
 
-            // ── Content ───────────────────────────────────────────────────────
             when (selectedTab) {
                 0 -> GroupChatContent(viewModel = viewModel)
                 1 -> P2PPeerListContent(viewModel = viewModel)
@@ -200,7 +190,7 @@ private fun ChatTab(
                     Text(
                         text = if (unread > 9) "9+" else unread.toString(),
                         fontSize = 8.sp,
-                        color = if (selected) Color.White else Color.White,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -208,10 +198,6 @@ private fun ChatTab(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group Chat content
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun GroupChatContent(viewModel: ChatViewModel) {
@@ -224,7 +210,6 @@ private fun GroupChatContent(viewModel: ChatViewModel) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // System context pill
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -238,20 +223,16 @@ private fun GroupChatContent(viewModel: ChatViewModel) {
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "Group · All peers on mesh · relayed to everyone",
+                    text = stringResource(R.string.chat_group_context),
                     fontSize = 9.sp,
                     color = MeshGreenDark
                 )
             }
         }
 
-        // Messages
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(MeshGray),
+            modifier = Modifier.weight(1f).fillMaxWidth().background(MeshGray),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -260,29 +241,20 @@ private fun GroupChatContent(viewModel: ChatViewModel) {
             }
         }
 
-        // Input bar
         ChatInputBar(
             value = input,
             onValueChange = viewModel::onGroupInputChange,
             onSend = viewModel::sendGroupMessage,
-            placeholder = "Message all peers…"
+            placeholder = stringResource(R.string.chat_input_group_placeholder)
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// P2P peer list
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun P2PPeerListContent(viewModel: ChatViewModel) {
     val peers by viewModel.peers.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MeshGray)
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(MeshGray)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -296,7 +268,7 @@ private fun P2PPeerListContent(viewModel: ChatViewModel) {
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "Tap a peer to open a private channel",
+                    text = stringResource(R.string.chat_p2p_hint),
                     fontSize = 9.sp,
                     color = MeshMid
                 )
@@ -309,20 +281,14 @@ private fun P2PPeerListContent(viewModel: ChatViewModel) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(peers, key = { it.deviceId }) { peer ->
-                PeerListItem(
-                    peer = peer,
-                    onClick = { viewModel.selectPeer(peer) }
-                )
+                PeerListItem(peer = peer, onClick = { viewModel.selectPeer(peer) })
             }
         }
     }
 }
 
 @Composable
-private fun PeerListItem(
-    peer: ChatPeer,
-    onClick: () -> Unit
-) {
+private fun PeerListItem(peer: ChatPeer, onClick: () -> Unit) {
     val triageColor = when (peer.triageColor) {
         "green" -> MeshGreen
         "yellow" -> MeshAmber
@@ -339,12 +305,8 @@ private fun PeerListItem(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MeshGreenLight),
+            modifier = Modifier.size(36.dp).clip(CircleShape).background(MeshGreenLight),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -357,7 +319,6 @@ private fun PeerListItem(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // Name + meta
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -367,47 +328,30 @@ private fun PeerListItem(
                     color = MeshDark
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                // Triage dot
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(triageColor)
-                )
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(triageColor))
             }
             Text(
-                text = "${peer.hopCount} hop${if (peer.hopCount != 1) "s" else ""} away",
+                text = if (peer.hopCount == 1)
+                    stringResource(R.string.status_hop_one, peer.hopCount)
+                else
+                    stringResource(R.string.status_hop_other, peer.hopCount),
                 fontSize = 10.sp,
                 color = MeshMid
             )
         }
 
-        // Unread badge
         if (peer.unreadCount > 0) {
             Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(MeshRed),
+                modifier = Modifier.size(20.dp).clip(CircleShape).background(MeshRed),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = peer.unreadCount.toString(),
-                    fontSize = 9.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = peer.unreadCount.toString(), fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         } else {
-            // Chevron hint
             Text(text = "›", fontSize = 18.sp, color = Color(0xFFCCCCCC))
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// P2P Conversation screen (opened after selecting a peer)
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun P2PChatConversationScreen(
@@ -430,12 +374,7 @@ private fun P2PChatConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        // Header
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -453,7 +392,7 @@ private fun P2PChatConversationScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = null,
                     tint = MeshMid,
                     modifier = Modifier.size(14.dp)
                 )
@@ -462,18 +401,10 @@ private fun P2PChatConversationScreen(
             Spacer(modifier = Modifier.width(10.dp))
 
             Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MeshGreenLight),
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(MeshGreenLight),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = peer.name.take(2).uppercase(),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MeshGreenDark
-                )
+                Text(text = peer.name.take(2).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MeshGreenDark)
             }
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -487,15 +418,13 @@ private fun P2PChatConversationScreen(
                         color = MeshDark
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(triageColor)
-                    )
+                    Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(triageColor))
                 }
                 Text(
-                    text = "${peer.hopCount} hop${if (peer.hopCount != 1) "s" else ""} · Private channel",
+                    text = if (peer.hopCount == 1)
+                        stringResource(R.string.chat_private_channel, peer.hopCount)
+                    else
+                        stringResource(R.string.chat_private_channel_plural, peer.hopCount),
                     fontSize = 9.sp,
                     color = MeshGreen
                 )
@@ -504,13 +433,9 @@ private fun P2PChatConversationScreen(
 
         HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
 
-        // Messages
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(MeshGray),
+            modifier = Modifier.weight(1f).fillMaxWidth().background(MeshGray),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -519,7 +444,6 @@ private fun P2PChatConversationScreen(
             }
         }
 
-        // Input bar
         ChatInputBar(
             value = input,
             onValueChange = viewModel::onP2pInputChange,
@@ -529,29 +453,17 @@ private fun P2PChatConversationScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared components
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun MessageBubble(message: ChatMessage) {
     if (message.isSystemMessage) {
-        // System / join notification pill
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.Black.copy(alpha = 0.05f))
                     .padding(horizontal = 10.dp, vertical = 3.dp)
             ) {
-                Text(
-                    text = message.text,
-                    fontSize = 9.sp,
-                    color = Color(0xFF888888)
-                )
+                Text(text = message.text, fontSize = 9.sp, color = Color(0xFF888888))
             }
         }
         return
@@ -566,43 +478,20 @@ private fun MessageBubble(message: ChatMessage) {
         horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start
     ) {
         if (message.isOutgoing) {
-            // Outgoing bubble (green, right-aligned)
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.widthIn(max = 260.dp)
-            ) {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 260.dp)) {
                 Box(
                     modifier = Modifier
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 10.dp, topEnd = 10.dp,
-                                bottomStart = 10.dp, bottomEnd = 2.dp
-                            )
-                        )
+                        .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp, bottomStart = 10.dp, bottomEnd = 2.dp))
                         .background(MeshGreen)
                         .padding(horizontal = 10.dp, vertical = 7.dp)
                 ) {
-                    Text(
-                        text = message.text,
-                        fontSize = 11.sp,
-                        color = Color.White,
-                        lineHeight = 16.sp
-                    )
+                    Text(text = message.text, fontSize = 11.sp, color = Color.White, lineHeight = 16.sp)
                 }
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = timeStr,
-                    fontSize = 8.sp,
-                    color = Color.Black.copy(alpha = 0.35f)
-                )
+                Text(text = timeStr, fontSize = 8.sp, color = Color.Black.copy(alpha = 0.35f))
             }
         } else {
-            // Incoming bubble (white, left-aligned)
-            Column(
-                horizontalAlignment = Alignment.Start,
-                modifier = Modifier.widthIn(max = 260.dp)
-            ) {
-                // Sender name + hop badge row
+            Column(horizontalAlignment = Alignment.Start, modifier = Modifier.widthIn(max = 260.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -620,39 +509,21 @@ private fun MessageBubble(message: ChatMessage) {
                                 .background(MeshGreenLight)
                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                         ) {
-                            Text(
-                                text = "${message.hopCount}↗",
-                                fontSize = 8.sp,
-                                color = MeshGreen
-                            )
+                            Text(text = "${message.hopCount}↗", fontSize = 8.sp, color = MeshGreen)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 2.dp, topEnd = 10.dp,
-                                bottomStart = 10.dp, bottomEnd = 10.dp
-                            )
-                        )
+                        .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 10.dp, bottomStart = 10.dp, bottomEnd = 10.dp))
                         .background(Color.White)
                         .padding(horizontal = 10.dp, vertical = 7.dp)
                 ) {
-                    Text(
-                        text = message.text,
-                        fontSize = 11.sp,
-                        color = MeshDark,
-                        lineHeight = 16.sp
-                    )
+                    Text(text = message.text, fontSize = 11.sp, color = MeshDark, lineHeight = 16.sp)
                 }
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = timeStr,
-                    fontSize = 8.sp,
-                    color = Color.Black.copy(alpha = 0.35f)
-                )
+                Text(text = timeStr, fontSize = 8.sp, color = Color.Black.copy(alpha = 0.35f))
             }
         }
     }
@@ -672,7 +543,6 @@ private fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Text field
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -683,19 +553,12 @@ private fun ChatInputBar(
             contentAlignment = Alignment.CenterStart
         ) {
             if (value.isEmpty()) {
-                Text(
-                    text = placeholder,
-                    fontSize = 11.sp,
-                    color = Color(0xFFBBBBBB)
-                )
+                Text(text = placeholder, fontSize = 11.sp, color = Color(0xFFBBBBBB))
             }
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                textStyle = TextStyle(
-                    fontSize = 11.sp,
-                    color = MeshDark
-                ),
+                textStyle = TextStyle(fontSize = 11.sp, color = MeshDark),
                 cursorBrush = SolidColor(MeshGreen),
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 3
@@ -704,7 +567,6 @@ private fun ChatInputBar(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Send button
         Box(
             modifier = Modifier
                 .size(38.dp)
@@ -715,7 +577,7 @@ private fun ChatInputBar(
         ) {
             Icon(
                 imageVector = Icons.Default.Send,
-                contentDescription = "Send",
+                contentDescription = null,
                 tint = if (value.isNotBlank()) Color.White else MeshMid,
                 modifier = Modifier.size(16.dp)
             )

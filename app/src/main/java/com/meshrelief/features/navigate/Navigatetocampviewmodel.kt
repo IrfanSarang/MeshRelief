@@ -8,12 +8,12 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.location.LocationProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.pow
@@ -26,20 +26,22 @@ data class NavigateToCampUiState(
     val campType: String = "",
     val campLatitude: Double = 0.0,
     val campLongitude: Double = 0.0,
-    val userLatitude: Double = 19.0760,
-    val userLongitude: Double = 72.8777,
+    val userLatitude: Double = 0.0,
+    val userLongitude: Double = 0.0,
     val distanceKm: Double = 0.0,
     val directionLabel: String = "N",
     val estimatedMinutes: Int = 0,
     val bearingDeg: Float = 0f,
     val compassHeadingDeg: Float = 0f,
     val isNavigating: Boolean = false,
-    val isLoaded: Boolean = false
+    val isLoaded: Boolean = false,
+    val isLocating: Boolean = false
 )
 
 @HiltViewModel
 class NavigateToCampViewModel @Inject constructor(
-    application: Application
+    application: Application,
+    private val locationProvider: LocationProvider
 ) : AndroidViewModel(application), SensorEventListener {
 
     private val _uiState = MutableStateFlow(NavigateToCampUiState())
@@ -50,7 +52,7 @@ class NavigateToCampViewModel @Inject constructor(
     private val rotationVectorSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    // Stub camp list — same pattern as CampDetailViewModel
+    // Stub camp list — real data wired in Issue #4/#5
     private val stubCamps = listOf(
         mapOf(
             "id" to "camp_001",
@@ -82,26 +84,51 @@ class NavigateToCampViewModel @Inject constructor(
         )
     )
 
+    init {
+        viewModelScope.launch { fetchUserLocation() }
+    }
+
+    fun autoSelectCamp(campId: String?) {
+        if (campId != null) loadCamp(campId)
+    }
+
+    /**
+     * Resolves the best available GPS/network fix and writes it into uiState.
+     * If no fix is available, lat/lng remain 0.0 and the UI should show a
+     * "waiting for GPS" indicator (isLocating = true until resolved).
+     */
+    private suspend fun fetchUserLocation() {
+        _uiState.value = _uiState.value.copy(isLocating = true)
+        val fix = locationProvider.getLastKnownLocation()
+        _uiState.value = _uiState.value.copy(
+            userLatitude = fix?.latitude ?: _uiState.value.userLatitude,
+            userLongitude = fix?.longitude ?: _uiState.value.userLongitude,
+            isLocating = false
+        )
+    }
+
     fun loadCamp(campId: String) {
         viewModelScope.launch {
+            // Refresh location right before computing navigation so the fix
+            // is as fresh as possible when the user opens this screen.
+            fetchUserLocation()
+
             val camp = stubCamps.find { it["id"] == campId } ?: stubCamps.first()
-            val campLat = (camp["lat"] as Double)
-            val campLng = (camp["lng"] as Double)
-            val userLat = 19.0760
-            val userLng = 72.8777
+            val campLat = camp["lat"] as Double
+            val campLng = camp["lng"] as Double
+            val userLat = _uiState.value.userLatitude
+            val userLng = _uiState.value.userLongitude
 
             val distance = haversineKm(userLat, userLng, campLat, campLng)
             val bearing = bearingDeg(userLat, userLng, campLat, campLng)
             val direction = compassLabel(bearing)
-            val walkMin = (distance / 0.067).roundToInt() // ~4 km/h walking
+            val walkMin = (distance / 0.067).roundToInt() // ~4 km/h
 
             _uiState.value = _uiState.value.copy(
                 campName = camp["name"] as String,
                 campType = camp["type"] as String,
                 campLatitude = campLat,
                 campLongitude = campLng,
-                userLatitude = userLat,
-                userLongitude = userLng,
                 distanceKm = (distance * 10).roundToInt() / 10.0,
                 directionLabel = direction,
                 estimatedMinutes = walkMin,
@@ -125,7 +152,7 @@ class NavigateToCampViewModel @Inject constructor(
         sensorManager.unregisterListener(this)
     }
 
-    // ---------- SensorEventListener ----------
+    // ── SensorEventListener ──────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
@@ -140,7 +167,7 @@ class NavigateToCampViewModel @Inject constructor(
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
-    // ---------- Math helpers ----------
+    // ── Math helpers ─────────────────────────────────────────────────────────
 
     private fun haversineKm(
         lat1: Double, lng1: Double,

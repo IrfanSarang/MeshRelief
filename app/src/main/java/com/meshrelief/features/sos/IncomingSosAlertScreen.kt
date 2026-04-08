@@ -46,6 +46,7 @@ private fun triageColorIncoming(level: IncomingTriageLevel): Color = when (level
 
 @Composable
 fun IncomingSosAlertScreen(
+    packet: com.meshrelief.mesh.protocol.MeshPacket?,
     onDismiss: () -> Unit,
     onNavigate: () -> Unit,
     viewModel: IncomingSosAlertViewModel = hiltViewModel()
@@ -56,19 +57,30 @@ fun IncomingSosAlertScreen(
         if (uiState.isDismissed) onDismiss()
     }
 
-    // Seed with demo data if nothing loaded yet (remove when wired to real packets)
-    LaunchedEffect(Unit) {
-        if (uiState.senderName == "Unknown") {
+    // Load from real packet if available, else fall back to demo data
+    LaunchedEffect(packet) {
+        if (packet != null) {
             viewModel.loadFromPacket(
-                senderName = "Ravi K.",
-                senderIdSuffix = "4401",
-                isVerified = false,
-                hopCount = 2,
+                senderName        = packet.senderName,
+                senderIdSuffix    = "????",
+                isVerified        = false,
+                hopCount          = 1,
+                triage            = IncomingTriageLevel.CRITICAL,
+                lat               = 0.0,
+                lng               = 0.0,
+                distanceKm        = 0f,
+                directionLabel    = "??",
+                message           = packet.payload,   // ← was packet.message
+                receivedTimeLabel = "now"
+            )
+        } else if (uiState.senderName == "Unknown") {
+            // DEV_ONLY fallback — unchanged
+            viewModel.loadFromPacket(
+                senderName = "Ravi K.", senderIdSuffix = "4401",
+                isVerified = false, hopCount = 2,
                 triage = IncomingTriageLevel.CRITICAL,
-                lat = 19.0760,
-                lng = 72.8777,
-                distanceKm = 0.8f,
-                directionLabel = "NE",
+                lat = 19.0760, lng = 72.8777,
+                distanceKm = 0.8f, directionLabel = "NE",
                 message = "Trapped under debris near station road. Leg injury. Need help urgently.",
                 receivedTimeLabel = "9:40 AM"
             )

@@ -2,9 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- WiFi Direct -->
+    <!-- ════════════════════════════════════════════════════════════════
+         Wi-Fi Direct (Issue #9)
+         CHANGE_NETWORK_STATE is required by WifiP2pManager.connect()
+         on API 29+. The others were already present.
+         ════════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission
@@ -34,6 +39,7 @@
     <!-- Background mesh service -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <application
         android:name=".MeshApplication"
@@ -55,6 +61,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             Foreground Mesh Service (Issue #11)
+             Keeps Wi-Fi Direct connections alive when the app is backgrounded.
+             ══════════════════════════════════════════════════════════════ -->
+        <service
+            android:name=".service.MeshForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!--
+        ══════════════════════════════════════════════════════════════════
+        NOTE — WifiP2pBroadcastReceiver (Issue #9)
+        ══════════════════════════════════════════════════════════════════
+        The receiver is registered/unregistered PROGRAMMATICALLY in
+        WifiDirectManager.initialize() / shutdown(), which are called
+        from MainActivity.onResume / onPause (see Issue #9 wiring note).
+
+        Do NOT register it statically here — WifiP2pManager intents are
+        not delivered to static receivers on API 26+ (background limits).
+        ══════════════════════════════════════════════════════════════════
+        -->
 
     </application>
 

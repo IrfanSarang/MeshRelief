@@ -16,11 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meshrelief.R
 import com.meshrelief.features.home.BottomNavBar
 import com.meshrelief.features.home.MeshAmber
 import com.meshrelief.features.home.MeshDark
@@ -29,11 +31,15 @@ import com.meshrelief.features.home.MeshGreen
 import com.meshrelief.features.home.MeshMid
 import com.meshrelief.features.home.MeshRed
 
-enum class CampFilter(val label: String) {
-    ALL("All"),
-    ACTIVE("Active"),
-    FULL("Full"),
-    NEARBY("Nearby")
+enum class CampFilter {
+    ALL, ACTIVE, FULL, NEARBY;
+
+    val labelRes: Int get() = when (this) {
+        ALL    -> R.string.camps_filter_all
+        ACTIVE -> R.string.camps_filter_active
+        FULL   -> R.string.camps_filter_full
+        NEARBY -> R.string.camps_filter_nearby
+    }
 }
 
 @Composable
@@ -48,7 +54,6 @@ fun CampFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         )
     )
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,7 +90,7 @@ fun CampsScreen(
                 shape = CircleShape,
                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add camp", modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.camps_add_fab), modifier = Modifier.size(22.dp))
             }
         }
     ) { innerPadding ->
@@ -95,22 +100,35 @@ fun CampsScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 items(CampFilter.entries.toTypedArray()) { filter ->
-                    CampFilterChip(label = filter.label, selected = uiState.filter == filter, onClick = { viewModel.setFilter(filter) })
+                    CampFilterChip(
+                        label = stringResource(filter.labelRes),
+                        selected = uiState.filter == filter,
+                        onClick = { viewModel.setFilter(filter) }
+                    )
                 }
             }
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
             val filtered = uiState.filtered
             Text(
-                text = "${filtered.size} camp${if (filtered.size != 1) "s" else ""} nearby",
-                fontSize = 11.sp, color = MeshMid,
+                text = if (filtered.size == 1)
+                    stringResource(R.string.camps_count_one, filtered.size)
+                else
+                    stringResource(R.string.camps_count_other, filtered.size),
+                fontSize = 11.sp,
+                color = MeshMid,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
             )
             if (filtered.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No camps found", fontSize = 14.sp, color = MeshMid, fontWeight = FontWeight.Medium)
+                        Text(
+                            stringResource(R.string.camps_none_title),
+                            fontSize = 14.sp,
+                            color = MeshMid,
+                            fontWeight = FontWeight.Medium
+                        )
                         Spacer(Modifier.height(4.dp))
-                        Text("Try a different filter", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        Text(stringResource(R.string.camps_none_sub), fontSize = 11.sp, color = Color(0xFFAAAAAA))
                     }
                 }
             } else {
@@ -133,7 +151,7 @@ fun CampsScreen(
 @Composable
 fun CampsTopBar() {
     TopAppBar(
-        title = { Text("Camps", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.camps_title), fontWeight = FontWeight.Bold) },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.White,
             titleContentColor = MeshDark
@@ -144,26 +162,20 @@ fun CampsTopBar() {
 @Composable
 fun CampCard(camp: CampDetail, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            // Left: colored bar showing occupancy level
             val fraction = camp.currentOccupancy.toFloat() / camp.capacity
             val barColor = when {
-                fraction > 0.90f -> MeshRed
+                fraction > 0.90f  -> MeshRed
                 fraction >= 0.70f -> MeshAmber
-                else -> MeshGreen
+                else              -> MeshGreen
             }
             Box(
                 modifier = Modifier
@@ -175,7 +187,6 @@ fun CampCard(camp: CampDetail, onClick: () -> Unit) {
 
             Spacer(Modifier.width(12.dp))
 
-            // Middle: camp name, type, occupancy, last updated
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = camp.name,
@@ -187,13 +198,13 @@ fun CampCard(camp: CampDetail, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "${camp.type} · ${camp.currentOccupancy}/${camp.capacity} people",
+                    text = stringResource(R.string.camps_card_occupancy, camp.type, camp.currentOccupancy, camp.capacity),
                     fontSize = 12.sp,
                     color = MeshMid
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Updated ${camp.lastUpdated}",
+                    text = stringResource(R.string.camps_card_updated, camp.lastUpdated),
                     fontSize = 11.sp,
                     color = Color(0xFFAAAAAA)
                 )
@@ -201,12 +212,8 @@ fun CampCard(camp: CampDetail, onClick: () -> Unit) {
 
             Spacer(Modifier.width(10.dp))
 
-            // Right: occupancy % badge
             val pct = (fraction * 100).toInt()
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = barColor.copy(alpha = 0.12f)
-            ) {
+            Surface(shape = RoundedCornerShape(20.dp), color = barColor.copy(alpha = 0.12f)) {
                 Text(
                     text = "$pct%",
                     color = barColor,

@@ -12,13 +12,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.meshrelief.core.model.TriageStatus
+import com.meshrelief.R
 import com.meshrelief.core.model.TriageLevel
 import com.meshrelief.features.home.MeshDark
 import com.meshrelief.features.home.MeshGray
@@ -43,17 +44,13 @@ fun SOSScreen(
                 .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .border(
-                        width = 0.5.dp,
-                        color = Color(0xFFEEEEEE)
-                    ),
+                    .border(width = 0.5.dp, color = Color(0xFFEEEEEE)),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -68,7 +65,7 @@ fun SOSScreen(
                     Text("←", fontSize = 14.sp, color = MeshMid)
                 }
                 Text(
-                    text = "Emergency SOS",
+                    text = stringResource(R.string.sos_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = MeshDark
@@ -77,9 +74,8 @@ fun SOSScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Triage selection label
             Text(
-                text = "Set your triage status",
+                text = stringResource(R.string.sos_triage_label),
                 fontSize = 12.sp,
                 color = MeshMid
             )
@@ -131,47 +127,36 @@ fun SOSScreen(
                 modifier = Modifier.size(160.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Outer ring
                 Box(
                     modifier = Modifier
                         .size(160.dp)
                         .clip(CircleShape)
-                        .border(
-                            width = 2.dp,
-                            color = Color(0xFFF7C1C1),
-                            shape = CircleShape
-                        )
+                        .border(width = 2.dp, color = Color(0xFFF7C1C1), shape = CircleShape)
                 )
-                // SOS button
                 Box(
                     modifier = Modifier
                         .size(124.dp)
                         .clip(CircleShape)
                         .background(
-                            if (uiState.cooldownRemainingMs > 0)
-                                Color(0xFFB4B2A9)
-                            else
-                                MeshRed
+                            if (uiState.cooldownRemainingMs > 0) Color(0xFFB4B2A9) else MeshRed
                         )
-                        .clickable(
-                            enabled = uiState.cooldownRemainingMs == 0L
-                        ) {
+                        .clickable(enabled = uiState.cooldownRemainingMs == 0L) {
                             viewModel.onSOSButtonPressed()
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "SOS",
+                            text = stringResource(R.string.sos_button_label),
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
                             text = if (uiState.cooldownRemainingMs > 0)
-                                "Locked"
+                                stringResource(R.string.sos_button_locked)
                             else
-                                "Hold to send",
+                                stringResource(R.string.sos_button_hold),
                             fontSize = 10.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
@@ -195,12 +180,12 @@ fun SOSScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Next SOS available in",
+                        text = stringResource(R.string.sos_cooldown_label),
                         fontSize = 11.sp,
                         color = MeshMid
                     )
                     Text(
-                        text = "%d:%02d remaining".format(minutes, seconds),
+                        text = stringResource(R.string.sos_cooldown_remaining, minutes, seconds),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = MeshDark
@@ -221,13 +206,13 @@ fun SOSScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "SOS broadcast sent",
+                        text = stringResource(R.string.sos_sent_title),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = MeshGreenDark
                     )
                     Text(
-                        text = "All nearby peers have been alerted",
+                        text = stringResource(R.string.sos_sent_sub),
                         fontSize = 11.sp,
                         color = Color(0xFF0F6E56)
                     )
@@ -247,37 +232,30 @@ fun SOSScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Confirm real emergency?",
+                        text = stringResource(R.string.sos_dialog_title),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = MeshDark,
                         textAlign = TextAlign.Center
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     Text(
-                        text = "This will alert ALL nearby devices immediately.",
+                        text = stringResource(R.string.sos_dialog_body),
                         fontSize = 12.sp,
                         color = MeshMid,
                         textAlign = TextAlign.Center
                     )
-
                     Spacer(modifier = Modifier.height(6.dp))
-
                     Text(
-                        text = "Auto-cancels in ${uiState.confirmCountdown}s",
+                        text = stringResource(R.string.sos_dialog_countdown, uiState.confirmCountdown),
                         fontSize = 11.sp,
                         color = Color(0xFFAAAAAA)
                     )
-
                     Spacer(modifier = Modifier.height(16.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Cancel
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -288,14 +266,12 @@ fun SOSScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Cancel",
+                                text = stringResource(R.string.sos_dialog_cancel),
                                 fontSize = 13.sp,
                                 color = MeshMid,
                                 fontWeight = FontWeight.Medium
                             )
                         }
-
-                        // Confirm
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -306,7 +282,7 @@ fun SOSScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Yes, Send",
+                                text = stringResource(R.string.sos_dialog_confirm),
                                 fontSize = 13.sp,
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium
