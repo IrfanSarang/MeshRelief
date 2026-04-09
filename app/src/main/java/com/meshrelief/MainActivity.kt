@@ -150,11 +150,14 @@ fun AppRoot(
         "home" -> HomeScreen(
             onSOSClick        = { currentScreen = "sos" },
             onChatClick       = { currentScreen = "chat" },
-            onMapClick        = { },
+            onMapClick        = { currentScreen = "map" },
             onStatusClick     = { currentScreen = "status" },
-            onChatbotClick    = { },
+            onChatbotClick    = { currentScreen = "chatbot" },
+            onBulletinClick   = { currentScreen = "bulletin" },
             onDiscoveryClick  = { currentScreen = "discovery" },
+            onFirstAidClick   = { currentScreen = "firstaid" },
             onCampsClick      = { currentScreen = "camps" },
+            onAdminClick      = { currentScreen = "admin" },
             onFakeIncomingSos = {
                 scope.launch {
                     AppEventBus.incomingSos.emit(

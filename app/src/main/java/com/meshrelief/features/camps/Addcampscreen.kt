@@ -37,6 +37,7 @@ import com.meshrelief.features.home.MeshGreenLight
 import com.meshrelief.features.home.MeshMid
 import com.meshrelief.features.home.MeshRed
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.BorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,11 +257,33 @@ fun AddCampScreen(
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    "📍 GPS auto-fill coming soon",
-                    fontSize = 11.sp,
-                    color = MeshMid
-                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { viewModel.fetchGpsLocation() },
+                    enabled = !uiState.isLocating,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MeshGreen,
+                        disabledContentColor = MeshMid
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (uiState.isLocating) MeshMid else MeshGreen
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (uiState.isLocating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = MeshMid,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Locating...", fontSize = 13.sp)
+                    } else {
+                        Text("📍  Use my location", fontSize = 13.sp)
+                    }
+                }
             }
 
             Spacer(Modifier.height(20.dp))

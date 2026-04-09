@@ -1,12 +1,24 @@
 package com.meshrelief.features.status
 
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.crypto.DeviceIdentity
 import com.meshrelief.data.preferences.UserPreferences
+import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.util.UUID
 import javax.inject.Inject
 
 data class MyStatusUiState(
@@ -15,12 +27,16 @@ data class MyStatusUiState(
     val userName: String = "",
     val userPhone: String = "",
     val isBroadcasting: Boolean = false,
-    val broadcastSuccess: Boolean = false
+    val broadcastSuccess: Boolean = false,
+    val broadcastError: String? = null
 )
 
 @HiltViewModel
 class MyStatusViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    @ApplicationContext private val context: Context,   // for BatteryManager
+    private val userPreferences: UserPreferences,
+    private val connectionManager: ConnectionManager,
+    private val deviceIdentity: DeviceIdentity
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyStatusUiState())
@@ -52,7 +68,8 @@ class MyStatusViewModel @Inject constructor(
     fun onTriageSelected(triage: String) {
         _uiState.value = _uiState.value.copy(
             selectedTriage = triage,
-            broadcastSuccess = false
+            broadcastSuccess = false,
+            broadcastError = null
         )
     }
 
@@ -64,14 +81,71 @@ class MyStatusViewModel @Inject constructor(
 
     fun onSaveAndBroadcast() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isBroadcasting = true)
-            userPreferences.saveTriageStatus(_uiState.value.selectedTriage)
-            userPreferences.saveStatusMessage(_uiState.value.statusMessage)
-            // WiFi Direct broadcast added in Phase 2
+            _uiState.value = _uiState.value.copy(
+                isBroadcasting = true,
+                broadcastSuccess = false,
+                broadcastError = null
+            )
+
+            // 1. Persist triage + message to DataStore
+            val triage = _uiState.value.selectedTriage
+            val message = _uiState.value.statusMessage
+            userPreferences.saveTriageStatus(triage)
+            userPreferences.saveStatusMessage(message)
+
+            // 2. Read sender info (single-shot read via first())
+            val deviceId = userPreferences.userDeviceId.first()
+            val name = userPreferences.userName.first()
+            val phone = userPreferences.userPhone.first()
+
+            // 3. Read current battery level via BatteryManager
+            val battery = getBatteryPercent()
+
+            // 4. Build JSON payload  { triage, message, battery }
+            val payload = JSONObject().apply {
+                put("triage", triage)
+                put("message", message)
+                put("battery", battery)
+            }.toString()
+
+            // 5. Build MeshPacket
+            //    signature is filled in by ConnectionManager.sendPacket() (Issue #15),
+            //    so we pass an empty string here.
+            val packet = MeshPacket(
+                id = UUID.randomUUID().toString(),
+                type = PacketType.DEVICE_STATUS,
+                senderId = deviceId,
+                senderName = name,
+                senderPhone = phone,
+                payload = payload,
+                ttl = 3,
+                timestamp = System.currentTimeMillis(),
+                signature = ""            // signed inside ConnectionManager
+            )
+
+            // 6. Broadcast to all visible peers
+            val results = connectionManager.broadcastPacket(packet)
+
+            // Consider it a success if at least one peer received the packet
+            // (or if there were no peers — offline/solo use is still valid)
+            val anyFailure = results.values.any { !it }
             _uiState.value = _uiState.value.copy(
                 isBroadcasting = false,
-                broadcastSuccess = true
+                broadcastSuccess = !anyFailure || results.isEmpty(),
+                broadcastError = if (anyFailure) "Some peers could not be reached" else null
             )
         }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private fun getBatteryPercent(): Int {
+        val intent: Intent? = context.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        )
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level >= 0 && scale > 0) (level * 100 / scale) else -1
     }
 }

@@ -10,6 +10,8 @@ class CampRepository @Inject constructor(private val dao: CampDao) {
 
     fun getAllCamps() = dao.getAllCamps()
 
+    fun getOpen() = dao.getOpen()
+
     suspend fun upsert(camp: CampEntity) = dao.upsert(camp)
 
     suspend fun getById(id: String) = dao.getCampById(id)

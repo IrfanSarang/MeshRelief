@@ -45,6 +45,20 @@ class WifiDirectManager @Inject constructor(
     private val _peerList = MutableStateFlow<List<WifiP2pDevice>>(emptyList())
     val peerList: StateFlow<List<WifiP2pDevice>> = _peerList.asStateFlow()
 
+    // ── Connected peer IPs ────────────────────────────────────────────────
+    /**
+     * Emits the list of actual IP addresses of currently connected peers.
+     *
+     * - If this device is the **Group Owner**: reads the ARP table from
+     *   /proc/net/arp to find IPs of connected clients.
+     * - If this device is a **client**: emits just the group owner's IP,
+     *   since that is the only directly reachable peer.
+     *
+     * Updated every time [WIFI_P2P_CONNECTION_CHANGED_ACTION] fires.
+     */
+    private val _connectedPeerIPs = MutableStateFlow<List<String>>(emptyList())
+    val connectedPeerIPs: StateFlow<List<String>> = _connectedPeerIPs.asStateFlow()
+
     // ── Connection info ───────────────────────────────────────────────────
     /** True when this device is the Group Owner in an active P2P group. */
     private var isGroupOwner: Boolean = false
@@ -100,10 +114,30 @@ class WifiDirectManager @Inject constructor(
                                     "Group formed. isOwner=$isGroupOwner " +
                                             "ownerAddr=$groupOwnerAddress"
                                 )
+
+                                // ── Populate connectedPeerIPs ──────────────
+                                if (info.isGroupOwner) {
+                                    // We are the GO: connected clients are
+                                    // listed in the ARP table after DHCP lease.
+                                    _connectedPeerIPs.value = getConnectedClientIPs()
+                                    Log.d(
+                                        TAG,
+                                        "GO mode: found ${_connectedPeerIPs.value.size} client(s) " +
+                                                "via ARP: ${_connectedPeerIPs.value}"
+                                    )
+                                } else {
+                                    // We are a client: only reachable peer is the GO.
+                                    val ownerIp = info.groupOwnerAddress?.hostAddress
+                                    _connectedPeerIPs.value = listOfNotNull(ownerIp)
+                                    Log.d(TAG, "Client mode: GO IP = $ownerIp")
+                                }
+                                // ──────────────────────────────────────────
+
                             } else {
                                 isGroupOwner = false
                                 groupOwnerAddress = null
-                                Log.d(TAG, "Group dissolved.")
+                                _connectedPeerIPs.value = emptyList()
+                                Log.d(TAG, "Group dissolved — peer IP list cleared.")
                             }
                         }
                     }
@@ -210,6 +244,7 @@ class WifiDirectManager @Inject constructor(
                 Log.d(TAG, "Group removed (disconnected).")
                 isGroupOwner = false
                 groupOwnerAddress = null
+                _connectedPeerIPs.value = emptyList()
             }
             override fun onFailure(reason: Int) {
                 Log.w(TAG, "removeGroup failed. Reason: $reason")
@@ -224,4 +259,33 @@ class WifiDirectManager @Inject constructor(
 
     /** True if this device is currently the group owner. */
     fun isGroupOwner(): Boolean = isGroupOwner
+
+    /**
+     * Reads /proc/net/arp to find IP addresses of devices that have received
+     * a DHCP lease from this device (only meaningful when we are the Group Owner).
+     *
+     * The ARP table format is:
+     *   IP address  HW type  Flags  HW address  Mask  Device
+     *
+     * We skip incomplete/empty entries (Flags == 0x0) to avoid returning
+     * stale or unresolved entries.
+     */
+    private fun getConnectedClientIPs(): List<String> {
+        return try {
+            java.io.File("/proc/net/arp")
+                .readLines()
+                .drop(1)                          // skip header line
+                .mapNotNull { line ->
+                    val parts = line.trim().split("\\s+".toRegex())
+                    // parts[0] = IP, parts[2] = flags ("0x2" means complete/valid)
+                    val ip    = parts.getOrNull(0)
+                    val flags = parts.getOrNull(2)
+                    if (ip != null && flags != null && flags != "0x0") ip else null
+                }
+                .filter { it.isNotBlank() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read ARP table: ${e.message}")
+            emptyList()
+        }
+    }
 }

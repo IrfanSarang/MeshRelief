@@ -100,22 +100,35 @@ class ConnectionManager @Inject constructor(
                 return@withContext emptyMap()
             }
 
-            val groupOwnerIp = wifiDirectManager.getGroupOwnerAddress()
-            if (groupOwnerIp == null) {
-                Log.w(TAG, "broadcastPacket: group owner address unknown — skipping.")
-                return@withContext emptyMap()
+            val results = mutableMapOf<String, Boolean>()
+
+            if (!wifiDirectManager.isGroupOwner()) {
+                // ── Non-owner: forward to group owner only ────────────────────
+                val groupOwnerIp = wifiDirectManager.getGroupOwnerAddress()
+                if (groupOwnerIp == null) {
+                    Log.w(TAG, "broadcastPacket: group owner address unknown — skipping.")
+                    return@withContext emptyMap()
+                }
+                results[groupOwnerIp] = sendPacket(packet, groupOwnerIp)
+
+            } else {
+                // ── Group Owner: send to every connected client individually ──
+                val registry = socketServer.peerIpRegistry
+                if (registry.isEmpty()) {
+                    Log.w(TAG, "broadcastPacket: GO has no peer IPs in registry yet.")
+                    return@withContext emptyMap()
+                }
+                for ((deviceId, ip) in registry) {
+                    Log.d(TAG, "GO broadcasting to $deviceId @ $ip")
+                    results[ip] = sendPacket(packet, ip)
+                }
             }
 
-            val results = mutableMapOf<String, Boolean>()
-            if (!wifiDirectManager.isGroupOwner()) {
-                // Non-owner: forward to group owner who relays to others
-                results[groupOwnerIp] = sendPacket(packet, groupOwnerIp)
-            } else {
-                Log.d(
-                    TAG,
-                    "broadcastPacket: device is GO — per-peer routing handled in Issue #11."
-                )
-            }
+            Log.d(TAG, "broadcastPacket done. Results: $results")
             results
         }
+
+    fun getPeerIp(deviceId: String): String? {
+        return socketServer.peerIpRegistry[deviceId]
+    }
 }

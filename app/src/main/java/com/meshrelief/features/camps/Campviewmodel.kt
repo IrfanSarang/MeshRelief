@@ -1,9 +1,22 @@
 package com.meshrelief.features.camps
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.event.AppEventBus
+import com.meshrelief.data.db.entity.CampEntity
+import com.meshrelief.data.repository.CampRepository
+import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.util.UUID
 import javax.inject.Inject
 
 data class CampResource(
@@ -40,112 +53,61 @@ data class CampDetailUiState(
 )
 
 @HiltViewModel
-class CampDetailViewModel @Inject constructor() : ViewModel() {
-
-    private val allCamps: List<CampDetail> = listOf(
-        CampDetail(
-            id = "camp_1",
-            name = "Nagpur Relief Hub",
-            type = "Mixed",
-            currentOccupancy = 142,
-            capacity = 200,
-            established = "14 Jul 2025",
-            adminContact = "Rajan Deshmukh",
-            lastUpdated = "2 hrs ago",
-            adminNotes = "Gate 2 is open 24hr. Medical tent is at the north end. Water tanker arrives at 08:00 and 18:00 daily. Blanket stock critically low — prioritise children.",
-            resources = listOf(
-                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
-                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.AVAILABLE),
-                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.OUT),
-                CampResource("\u26A1", "Power", ResourceStatus.LOW)
-            ),
-            latitude = 21.1458,
-            longitude = 79.0882
-        ),
-        CampDetail(
-            id = "camp_2",
-            name = "Amravati Shelter Point",
-            type = "Shelter",
-            currentOccupancy = 89,
-            capacity = 150,
-            established = "12 Jul 2025",
-            adminContact = "Priya Sharma",
-            lastUpdated = "45 mins ago",
-            adminNotes = "Families with children on ground floor east wing. No open fires near tents. Curfew at 22:00. Report any medical emergency to block coordinator.",
-            resources = listOf(
-                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
-                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
-                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                CampResource("\u26A1", "Power", ResourceStatus.OUT)
-            ),
-            latitude = 20.9333,
-            longitude = 77.7500
-        ),
-        CampDetail(
-            id = "camp_3",
-            name = "Wardha Medical Camp",
-            type = "Medical",
-            currentOccupancy = 197,
-            capacity = 210,
-            established = "11 Jul 2025",
-            adminContact = "Dr. Meena Kulkarni",
-            lastUpdated = "15 mins ago",
-            adminNotes = "Critical patients in Block C. Do not enter without clearance. Oxygen cylinders on reserve only. Next resupply convoy expected tomorrow at noon.",
-            resources = listOf(
-                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.LOW),
-                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.LOW),
-                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.OUT),
-                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                CampResource("\u26A1", "Power", ResourceStatus.AVAILABLE)
-            ),
-            latitude = 20.7453,
-            longitude = 78.6022
-        )
-    )
+class CampDetailViewModel @Inject constructor(
+    private val campRepository: CampRepository,
+    private val connectionManager: ConnectionManager
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CampDetailUiState())
     val uiState: StateFlow<CampDetailUiState> = _uiState
 
+    // Live Room-backed list, updated whenever DB changes or a mesh event arrives
+    private var liveAllCamps: List<CampDetail> = emptyList()
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
     init {
-        setFilter(CampFilter.ALL)
+        // 1. Collect Room → update UI
+        campRepository.getAllCamps()
+            .onEach { entities ->
+                liveAllCamps = entities.map { it.toCampDetail() }
+                applyFilter(_uiState.value.filter)
+            }
+            .launchIn(viewModelScope)
+
+        // 2. Collect mesh campUpdate events → upsert to Room
+        viewModelScope.launch {
+            AppEventBus.campUpdate.collect { packet ->
+                runCatching {
+                    val entity = json.decodeFromString<CampEntity>(packet.payload)
+                    campRepository.upsert(entity)
+                }
+            }
+        }
     }
 
     fun loadCamp(campId: String) {
-        val detail = allCamps.find { it.id == campId } ?: CampDetail(
-            id = campId,
-            name = "Relief Camp $campId",
-            type = "Supply",
-            currentOccupancy = 55,
-            capacity = 120,
-            established = "10 Jul 2025",
-            adminContact = "Field Coordinator",
-            lastUpdated = "1 hr ago",
-            adminNotes = "Supply distribution at 09:00 and 15:00. Bring your allocation slip.",
-            resources = listOf(
-                CampResource("\uD83D\uDCA7", "Water", ResourceStatus.AVAILABLE),
-                CampResource("\uD83C\uDF5A", "Food", ResourceStatus.AVAILABLE),
-                CampResource("\uD83D\uDC8A", "Medicine", ResourceStatus.LOW),
-                CampResource("\uD83E\uDDF9", "Blankets", ResourceStatus.AVAILABLE),
-                CampResource("\u26A1", "Power", ResourceStatus.LOW)
-            ),
-            latitude = 20.5000,
-            longitude = 78.0000
-        )
-        _uiState.value = _uiState.value.copy(camp = detail)
+        viewModelScope.launch {
+            val entity = campRepository.getById(campId)
+            val detail = entity?.toCampDetail()
+            _uiState.value = _uiState.value.copy(camp = detail)
+        }
     }
 
     fun setFilter(filter: CampFilter) {
+        applyFilter(filter)
+    }
+
+    private fun applyFilter(filter: CampFilter) {
         val filtered = when (filter) {
-            CampFilter.ALL    -> allCamps
-            CampFilter.ACTIVE -> allCamps.filter {
-                it.currentOccupancy.toFloat() / it.capacity < 0.9f
+            CampFilter.ALL    -> liveAllCamps
+            CampFilter.ACTIVE -> liveAllCamps.filter {
+                it.currentOccupancy.toFloat() / it.capacity.coerceAtLeast(1) < 0.9f
             }
-            CampFilter.FULL   -> allCamps.filter {
-                it.currentOccupancy.toFloat() / it.capacity >= 0.9f
+            CampFilter.FULL   -> liveAllCamps.filter {
+                it.currentOccupancy.toFloat() / it.capacity.coerceAtLeast(1) >= 0.9f
             }
-            CampFilter.NEARBY -> allCamps.take(2)
+            CampFilter.NEARBY -> liveAllCamps.take(2)
         }
         _uiState.value = _uiState.value.copy(filter = filter, filtered = filtered)
     }
@@ -163,15 +125,61 @@ class CampDetailViewModel @Inject constructor() : ViewModel() {
     }
 
     fun sendBroadcast() {
-        _uiState.value = _uiState.value.copy(
-            showBroadcastSheet = false,
-            broadcastMessage = "",
-            showSnackbar = true,
-            snackbarMessage = "Update broadcast to mesh"
-        )
+        val message = _uiState.value.broadcastMessage.trim()
+        if (message.isBlank()) return
+
+        viewModelScope.launch {
+            val packet = MeshPacket(
+                id = UUID.randomUUID().toString(),
+                type = PacketType.BULLETIN,
+                senderId = "",          // filled by DeviceIdentity layer on sign
+                senderName = "",
+                senderPhone = "",
+                payload = message,
+                ttl = 5,
+                timestamp = System.currentTimeMillis(),
+                signature = ""          // signed inside ConnectionManager.sendPacket
+            )
+            connectionManager.broadcastPacket(packet)
+
+            _uiState.value = _uiState.value.copy(
+                showBroadcastSheet = false,
+                broadcastMessage = "",
+                showSnackbar = true,
+                snackbarMessage = "Update broadcast to mesh"
+            )
+        }
     }
 
     fun clearSnackbar() {
         _uiState.value = _uiState.value.copy(showSnackbar = false, snackbarMessage = "")
+    }
+
+    // ── Mapper ────────────────────────────────────────────────────────────
+
+    private fun CampEntity.toCampDetail() = CampDetail(
+        id = id,
+        name = name,
+        type = type,
+        currentOccupancy = currentCount,
+        capacity = capacity,
+        established = "",           // not stored in entity; keep blank or add field later
+        adminContact = adminId,
+        lastUpdated = updatedAt.toRelativeLabel(),
+        adminNotes = notes,
+        resources = emptyList(),    // resource rows not in entity yet; add when schema grows
+        latitude = lat,
+        longitude = lng
+    )
+
+    private fun Long.toRelativeLabel(): String {
+        val diff = System.currentTimeMillis() - this
+        val mins = diff / 60_000
+        return when {
+            mins < 1   -> "just now"
+            mins < 60  -> "$mins mins ago"
+            mins < 1440 -> "${mins / 60} hrs ago"
+            else        -> "${mins / 1440} days ago"
+        }
     }
 }

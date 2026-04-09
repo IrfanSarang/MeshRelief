@@ -18,4 +18,7 @@ interface CampDao {
 
     @Update
     suspend fun update(camp: CampEntity)
+
+    @Query("SELECT * FROM camps WHERE currentCount < capacity AND status = 'OPEN'")
+    fun getOpen(): Flow<List<CampEntity>>
 }

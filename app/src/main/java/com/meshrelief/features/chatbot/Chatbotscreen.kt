@@ -117,8 +117,10 @@ fun ChatbotScreen(
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
                         )
+                        // ISSUE 15 FIX: Removed misleading "No AI server required" claim.
+                        // The chatbot is keyword-based, not model-driven.
                         Text(
-                            text = "100% Offline • No AI server required",
+                            text = "Offline survival guide • No internet needed",
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 11.sp
                         )

@@ -60,19 +60,7 @@ fun IncomingSosAlertScreen(
     // Load from real packet if available, else fall back to demo data
     LaunchedEffect(packet) {
         if (packet != null) {
-            viewModel.loadFromPacket(
-                senderName        = packet.senderName,
-                senderIdSuffix    = "????",
-                isVerified        = false,
-                hopCount          = 1,
-                triage            = IncomingTriageLevel.CRITICAL,
-                lat               = 0.0,
-                lng               = 0.0,
-                distanceKm        = 0f,
-                directionLabel    = "??",
-                message           = packet.payload,   // ← was packet.message
-                receivedTimeLabel = "now"
-            )
+            viewModel.loadFromMeshPacket(packet)
         } else if (uiState.senderName == "Unknown") {
             // DEV_ONLY fallback — unchanged
             viewModel.loadFromPacket(

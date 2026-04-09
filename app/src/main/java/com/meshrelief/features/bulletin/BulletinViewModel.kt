@@ -2,12 +2,17 @@ package com.meshrelief.features.bulletin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.event.AppEventBus
+import com.meshrelief.data.db.entity.BulletinEntity
+import com.meshrelief.data.preferences.UserPreferences
+import com.meshrelief.data.repository.BulletinRepository
+import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 // ─── Data models ──────────────────────────────────────────────────────────────
@@ -25,12 +30,12 @@ data class BulletinItem(
     val category: BulletinCategory,
     val message: String,
     val timestampMillis: Long,
-    val isRelayed: Boolean          // true = received over mesh, false = posted locally
+    val isRelayed: Boolean
 )
 
 data class BulletinUiState(
     val bulletins: List<BulletinItem> = emptyList(),
-    val selectedFilter: BulletinCategory? = null,   // null = All
+    val selectedFilter: BulletinCategory? = null,
     val isSheetOpen: Boolean = false,
     val composeCategory: BulletinCategory = BulletinCategory.GENERAL,
     val composeText: String = ""
@@ -39,70 +44,32 @@ data class BulletinUiState(
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
 @HiltViewModel
-class BulletinViewModel @Inject constructor() : ViewModel() {
+class BulletinViewModel @Inject constructor(
+    private val repository: BulletinRepository,
+    private val connectionManager: ConnectionManager,
+    private val userPreferences: UserPreferences
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BulletinUiState())
     val uiState: StateFlow<BulletinUiState> = _uiState.asStateFlow()
 
-    private val now = System.currentTimeMillis()
-    private fun minsAgo(m: Long) = now - m * 60_000L
-
     init {
-        loadSeedData()
-    }
+        // 1. Stream Room → UI
+        viewModelScope.launch {
+            repository.getAllBulletins()
+                .map { entities -> entities.map { it.toBulletinItem() } }
+                .collect { items ->
+                    _uiState.update { it.copy(bulletins = items) }
+                }
+        }
 
-    private fun loadSeedData() {
-        val seed = listOf(
-            BulletinItem(
-                id = "b1",
-                senderName = "Admin – Relief Team",
-                category = BulletinCategory.EVACUATION,
-                message = "Dharavi Zone 4 residents: evacuate immediately via LBS Road. Flooding expected within 2 hours. Move to Camp B (Community Hall).",
-                timestampMillis = minsAgo(3),
-                isRelayed = false
-            ),
-            BulletinItem(
-                id = "b2",
-                senderName = "Ravi Kumar",
-                category = BulletinCategory.MEDICAL,
-                message = "Insulin and BP medication urgently needed near Station Road. Please relay to any medic or first-aid camp.",
-                timestampMillis = minsAgo(11),
-                isRelayed = true
-            ),
-            BulletinItem(
-                id = "b3",
-                senderName = "Priya Nair",
-                category = BulletinCategory.RESOURCES,
-                message = "Water packets available at Temple Square — enough for ~80 people. First come first served. Bring your own containers if possible.",
-                timestampMillis = minsAgo(18),
-                isRelayed = true
-            ),
-            BulletinItem(
-                id = "b4",
-                senderName = "Admin – Relief Team",
-                category = BulletinCategory.EVACUATION,
-                message = "North bridge is structurally unsafe. Do NOT cross under any circumstances. Use the southern flyover instead.",
-                timestampMillis = minsAgo(25),
-                isRelayed = false
-            ),
-            BulletinItem(
-                id = "b5",
-                senderName = "Sameer Patil",
-                category = BulletinCategory.GENERAL,
-                message = "Generator running at Block 7. Phone charging available 6–8 PM daily. Bring your own cable.",
-                timestampMillis = minsAgo(47),
-                isRelayed = true
-            ),
-            BulletinItem(
-                id = "b6",
-                senderName = "Fatima Sheikh",
-                category = BulletinCategory.MEDICAL,
-                message = "Two trained nurses at Camp A (School Ground). Minor injuries and wound dressing – no appointment needed. Waiting time ~10 mins.",
-                timestampMillis = minsAgo(62),
-                isRelayed = true
-            )
-        )
-        _uiState.update { it.copy(bulletins = seed) }
+        // 2. Collect incoming bulletin packets from the mesh
+        viewModelScope.launch {
+            AppEventBus.bulletin.collect { packet ->
+                val entity = packet.toBulletinEntity(isRelayed = true)
+                repository.save(entity)   // Room insert triggers the flow above automatically
+            }
+        }
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────
@@ -118,7 +85,6 @@ class BulletinViewModel @Inject constructor() : ViewModel() {
         } else {
             state.bulletins.filter { it.category == state.selectedFilter }
         }
-        // EVACUATION items pinned to top
         return base.sortedWith(
             compareByDescending<BulletinItem> { it.category == BulletinCategory.EVACUATION }
                 .thenByDescending { it.timestampMillis }
@@ -133,7 +99,8 @@ class BulletinViewModel @Inject constructor() : ViewModel() {
         it.copy(isSheetOpen = false, composeText = "", composeCategory = BulletinCategory.GENERAL)
     }
 
-    fun setComposeCategory(cat: BulletinCategory) = _uiState.update { it.copy(composeCategory = cat) }
+    fun setComposeCategory(cat: BulletinCategory) =
+        _uiState.update { it.copy(composeCategory = cat) }
 
     fun setComposeText(text: String) {
         if (text.length <= 280) _uiState.update { it.copy(composeText = text) }
@@ -144,17 +111,43 @@ class BulletinViewModel @Inject constructor() : ViewModel() {
         val trimmed = state.composeText.trim()
         if (trimmed.isBlank()) return
 
-        val newItem = BulletinItem(
-            id = "b${System.currentTimeMillis()}",
-            senderName = "You",
-            category = state.composeCategory,
-            message = trimmed,
-            timestampMillis = System.currentTimeMillis(),
-            isRelayed = false
-        )
-
         viewModelScope.launch {
-            _uiState.update { it.copy(bulletins = listOf(newItem) + it.bulletins) }
+            // Read user identity (one-shot first value)
+            val senderName = userPreferences.userName.first().ifBlank { "Unknown" }
+            val senderId   = userPreferences.userDeviceId.first().ifBlank { UUID.randomUUID().toString() }
+
+            val packetId  = UUID.randomUUID().toString()
+            val timestamp = System.currentTimeMillis()
+
+            // a. Build the payload: "CATEGORY|message"
+            val payload = "${state.composeCategory.name}|$trimmed"
+
+            // b. Build MeshPacket and broadcast over mesh
+            val packet = MeshPacket(
+                id          = packetId,
+                type        = PacketType.BULLETIN,
+                senderId    = senderId,
+                senderName  = senderName,
+                senderPhone = "",
+                payload     = payload,
+                ttl         = 5,
+                timestamp   = timestamp,
+                signature   = ""   // ConnectionManager signs before sending
+            )
+            connectionManager.broadcastPacket(packet)
+
+            // c. Persist locally (isRelayed = false → own post)
+            val entity = BulletinEntity(
+                id         = packetId,
+                senderId   = senderId,
+                senderName = senderName,
+                type       = state.composeCategory.name,
+                content    = trimmed,
+                timestamp  = timestamp,
+                relayCount = 0
+            )
+            repository.save(entity)
+
             closeSheet()
         }
     }
@@ -165,11 +158,52 @@ class BulletinViewModel @Inject constructor() : ViewModel() {
         val diff = System.currentTimeMillis() - millis
         val mins = (diff / 60_000).toInt()
         return when {
-            mins < 1 -> "just now"
-            mins == 1 -> "1 min ago"
-            mins < 60 -> "$mins mins ago"
+            mins < 1   -> "just now"
+            mins == 1  -> "1 min ago"
+            mins < 60  -> "$mins mins ago"
             mins < 120 -> "1 hr ago"
-            else -> "${mins / 60} hrs ago"
+            else       -> "${mins / 60} hrs ago"
         }
     }
+}
+
+// ─── Mapping extensions ───────────────────────────────────────────────────────
+
+/**
+ * BulletinEntity.type is stored as the BulletinCategory name string.
+ * Falls back to GENERAL if an unknown value arrives.
+ */
+private fun BulletinEntity.toBulletinItem(): BulletinItem =
+    BulletinItem(
+        id             = id,
+        senderName     = senderName,
+        category       = runCatching { BulletinCategory.valueOf(type) }
+            .getOrDefault(BulletinCategory.GENERAL),
+        message        = content,
+        timestampMillis = timestamp,
+        isRelayed      = relayCount > 0
+    )
+
+/**
+ * Incoming MeshPacket payload format: "CATEGORY|message text"
+ * Falls back to GENERAL category if the prefix is missing/unknown.
+ */
+private fun MeshPacket.toBulletinEntity(isRelayed: Boolean): BulletinEntity {
+    val parts    = payload.split("|", limit = 2)
+    val category = if (parts.size == 2)
+        runCatching { BulletinCategory.valueOf(parts[0]) }.getOrNull()?.name
+            ?: BulletinCategory.GENERAL.name
+    else
+        BulletinCategory.GENERAL.name
+    val content  = if (parts.size == 2) parts[1] else payload
+
+    return BulletinEntity(
+        id         = id,
+        senderId   = senderId,
+        senderName = senderName,
+        type       = category,
+        content    = content,
+        timestamp  = timestamp,
+        relayCount = if (isRelayed) 1 else 0
+    )
 }

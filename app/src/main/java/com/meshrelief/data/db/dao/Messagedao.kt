@@ -13,6 +13,19 @@ interface MessageDao {
     @Query("SELECT * FROM messages ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<MessageEntity>>
 
+    // Issue #3 — group messages are stored with receiverId = "GROUP"
+    @Query("SELECT * FROM messages WHERE receiverId = 'GROUP' ORDER BY timestamp ASC")
+    fun getGroupMessages(): Flow<List<MessageEntity>>
+
+    // Issue #3 — P2P thread between this device and a specific peer
+    @Query("""
+        SELECT * FROM messages
+        WHERE (senderId = :myDeviceId AND receiverId = :peerId)
+           OR (senderId = :peerId   AND receiverId = :myDeviceId)
+        ORDER BY timestamp ASC
+    """)
+    fun getP2pMessages(myDeviceId: String, peerId: String): Flow<List<MessageEntity>>
+
     @Query("SELECT * FROM messages WHERE receiverId = :peerId OR senderId = :peerId ORDER BY timestamp ASC")
     fun getMessagesWithPeer(peerId: String): Flow<List<MessageEntity>>
 

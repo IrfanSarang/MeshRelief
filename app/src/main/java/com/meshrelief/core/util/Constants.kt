@@ -30,7 +30,7 @@ object Constants {
     const val MAP_TILE_CACHE_MB = 200
 
     // Chatbot
-    const val MODEL_FILE_NAME = "survival_qwen_q4.gguf"
+    //const val MODEL_FILE_NAME = "survival_qwen_q4.gguf"
 
     // Battery saver
     const val SAVER_MODE_DISCOVERY_INTERVAL_S = 120

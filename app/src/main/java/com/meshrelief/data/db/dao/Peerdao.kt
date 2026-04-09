@@ -18,4 +18,7 @@ interface PeerDao {
 
     @Query("DELETE FROM peers WHERE lastSeen < :cutoff")
     suspend fun deleteStalePeers(cutoff: Long)
+
+    @Query("SELECT * FROM peers WHERE verified = 1")
+    fun getVerified(): Flow<List<PeerEntity>>
 }

@@ -15,4 +15,7 @@ interface BulletinDao {
 
     @Query("DELETE FROM bulletins WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
+
+    @Query("SELECT * FROM bulletins ORDER BY timestamp DESC LIMIT :n")
+    fun getLatest(n: Int): Flow<List<BulletinEntity>>
 }

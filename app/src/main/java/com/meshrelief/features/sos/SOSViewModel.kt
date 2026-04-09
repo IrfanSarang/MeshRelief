@@ -2,32 +2,27 @@ package com.meshrelief.features.sos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meshrelief.core.location.LocationProvider
 import com.meshrelief.core.model.TriageLevel
 import com.meshrelief.core.util.Constants
+import com.meshrelief.data.db.entity.SOSEntity
 import com.meshrelief.data.preferences.UserPreferences
+import com.meshrelief.data.repository.SOSRepository
+import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
-// The local "enum class TriageStatus" has been removed.
-// This file now uses com.meshrelief.core.model.TriageLevel (SAFE, MINOR, CRITICAL, UNKNOWN).
-//
-// Migration note — UNRESPONSIVE → UNKNOWN:
-//   The old local enum had an UNRESPONSIVE value that does not exist in the
-//   canonical TriageLevel. UNRESPONSIVE has been mapped to UNKNOWN because
-//   both indicate the same UX outcome (person cannot self-report). If a
-//   distinct UNRESPONSIVE state is needed in the future it should be added
-//   to TriageLevel in core/model/ rather than re-introduced locally.
-//
-// label / color are now sourced from TriageLevel.label and TriageLevel.color
-// so the UI layer no longer needs to maintain its own colour mapping.
-
 data class SOSUiState(
-    val selectedTriage: TriageLevel = TriageLevel.SAFE,   // was: local TriageStatus
+    val selectedTriage: TriageLevel = TriageLevel.SAFE,
     val showConfirmDialog: Boolean = false,
     val confirmCountdown: Int = 10,
     val cooldownRemainingMs: Long = 0L,
@@ -38,7 +33,10 @@ data class SOSUiState(
 
 @HiltViewModel
 class SOSViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val connectionManager: ConnectionManager,
+    private val sosRepository: SOSRepository,
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SOSUiState())
@@ -60,7 +58,7 @@ class SOSViewModel @Inject constructor(
         }
     }
 
-    fun onTriageSelected(triage: TriageLevel) {             // was: local TriageStatus
+    fun onTriageSelected(triage: TriageLevel) {
         _uiState.value = _uiState.value.copy(selectedTriage = triage)
     }
 
@@ -80,7 +78,53 @@ class SOSViewModel @Inject constructor(
             sosSent = true
         )
         startCooldown()
-        // Wi-Fi Direct broadcast will be added in Phase 2
+
+        viewModelScope.launch {
+            // 1. Grab device ID (first emission is enough)
+            val deviceId = userPreferences.userDeviceId.first()
+
+            // 2. Get last known location (null-safe)
+            val location = locationProvider.getLastKnownLocation()
+            val lat = location?.latitude ?: 0.0
+            val lng = location?.longitude ?: 0.0
+
+            val state = _uiState.value
+            val packetId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+
+            // 3. Build payload JSON manually (no extra dependency needed)
+            val payload = """{"triage":"CRITICAL","lat":$lat,"lng":$lng,"message":""}"""
+
+            // 4. Build MeshPacket
+            val packet = MeshPacket(
+                id        = packetId,
+                type      = PacketType.SOS_ALERT,
+                senderId  = deviceId,
+                senderName  = state.userName,
+                senderPhone = state.userPhone,
+                payload   = payload,
+                ttl       = Constants.SOS_TTL,
+                timestamp = now,
+                signature = "" // ConnectionManager signs before send
+            )
+
+            // 5. Broadcast over Wi-Fi Direct
+            connectionManager.broadcastPacket(packet)
+
+            // 6. Persist to Room
+            val entity = SOSEntity(
+                id           = packetId,
+                senderId     = deviceId,
+                senderName   = state.userName,
+                senderPhone4 = state.userPhone,
+                lat          = lat,
+                lng          = lng,
+                triageStatus = state.selectedTriage.name,
+                message      = "",
+                timestamp    = now
+            )
+            sosRepository.save(entity)
+        }
     }
 
     fun onCancelSOS() {
@@ -98,7 +142,6 @@ class SOSViewModel @Inject constructor(
                 delay(1000)
                 _uiState.value = _uiState.value.copy(confirmCountdown = i)
             }
-            // Auto cancel after 10 seconds
             onCancelSOS()
         }
     }

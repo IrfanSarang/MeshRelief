@@ -12,5 +12,5 @@ data class MeshPacket(
     val payload: String,
     val ttl: Int,
     val timestamp: Long,
-    val signature: String
+    val signature: String,
 )

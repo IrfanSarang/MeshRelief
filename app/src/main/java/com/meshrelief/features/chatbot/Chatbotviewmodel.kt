@@ -36,7 +36,7 @@ data class ChatbotUiState(
     val selectedCategory: ChatbotCategory? = null
 )
 
-// ── Offline knowledge base (≥5 entries per category) ─────────────────────────
+// ── Offline knowledge base ────────────────────────────────────────────────────
 
 private data class KnowledgeEntry(
     val keywords: List<String>,
@@ -77,6 +77,26 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         category = ChatbotCategory.WATER,
         answer = "💧 Solar disinfection (SODIS): Fill a clear PET bottle with filtered water, lay it in direct sunlight for 6 hours (or 2 days if cloudy). UV rays kill most pathogens. Only works in clear bottles — not glass or coloured plastic."
     ),
+    KnowledgeEntry(
+        keywords = listOf("well", "groundwater", "borewell", "spring", "underground water"),
+        category = ChatbotCategory.WATER,
+        answer = "💧 Well & spring water: After a flood or earthquake, assume all wells are contaminated. Wait for official clearance before using well water. Springs are generally safer than surface water but must still be boiled. Never draw water from a well using a bucket that has touched the ground."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("saltwater", "sea water", "ocean water", "brackish"),
+        category = ChatbotCategory.WATER,
+        answer = "💧 Saltwater: NEVER drink seawater or brackish water — it accelerates dehydration and causes kidney failure. You can distill it: boil water in a covered pot with a tube leading to a cooler container; the condensed steam collected is salt-free. This requires a heat source and time."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("store water", "container", "water storage", "reserve"),
+        category = ChatbotCategory.WATER,
+        answer = "💧 Water storage: Use clean, food-grade plastic or metal containers with tight lids. Store in a cool, dark place. Pre-boiled water stays safe for up to 6 months in sealed containers. Label containers with the date filled. Never store water in containers that previously held chemicals or fuel."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("cyclone water", "tsunami water", "flood water", "after disaster water"),
+        category = ChatbotCategory.WATER,
+        answer = "💧 Post-disaster water: After cyclones, floods, or tsunamis, ALL open water sources are contaminated — treat them as sewage. Rely only on sealed bottled water or water you have boiled yourself. Floodwater may contain cholera, typhoid, leptospirosis, and chemical runoff."
+    ),
 
     // ── FOOD ─────────────────────────────────────────────────────────────────
     KnowledgeEntry(
@@ -108,6 +128,26 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         keywords = listOf("catch fish", "fishing", "protein", "insects"),
         category = ChatbotCategory.FOOD,
         answer = "🥫 Emergency protein: Fish from rivers/ponds using improvised line and hook. Insects like grasshoppers, crickets, and termites are safe to eat after removing wings and legs — boil or roast them. Avoid brightly coloured insects; bright colours signal toxicity."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("diabetic", "diabetes", "blood sugar", "insulin", "medical diet"),
+        category = ChatbotCategory.FOOD,
+        answer = "🥫 Diabetics in disaster: If insulin is unavailable, minimise carbohydrate intake — avoid rice, sugar, and bread. Prioritise proteins and fats. Watch for signs of hyperglycaemia (excessive thirst, frequent urination, confusion) or hypoglycaemia (shaking, sweating, sudden confusion). Seek medical aid as soon as possible."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("baby food", "infant", "breastfeed", "formula", "toddler"),
+        category = ChatbotCategory.FOOD,
+        answer = "🥫 Feeding infants in disaster: Breastfeeding is the safest option — breast milk needs no clean water or preparation. If formula is unavoidable, use only boiled, cooled water for mixing. Do not dilute formula — it causes malnutrition. Relief camps usually have priority supplies for infants; register with camp authorities immediately."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("food poisoning", "vomiting", "diarrhea", "stomach pain", "nausea"),
+        category = ChatbotCategory.FOOD,
+        answer = "🥫 Food poisoning treatment: Stop eating suspect food. Drink boiled water with a pinch of salt + sugar (ORS) to replace lost fluids — 1 litre water, 6 tsp sugar, ½ tsp salt. Rest. Seek medical help if: there is blood in stool, high fever, or vomiting persists beyond 24 hours in adults or 6 hours in children."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("coconut", "sugarcane", "jackfruit", "banana", "local fruit"),
+        category = ChatbotCategory.FOOD,
+        answer = "🥫 India-specific survival foods: Tender coconut water is sterile, nutritious, and widely available in coastal/tropical regions. Raw green banana and raw jackfruit can be boiled as vegetables. Tamarind provides vitamin C. Sugarcane juice provides quick energy but no lasting nutrition. Always wash and peel fruit before eating."
     ),
 
     // ── FIRST AID ─────────────────────────────────────────────────────────────
@@ -141,6 +181,31 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         category = ChatbotCategory.FIRST_AID,
         answer = "🩹 Heat stroke emergency: Move person to shade immediately. Remove outer clothing. Apply cool water to skin and fan vigorously. Ice packs to neck, armpits, and groin if available. Give cool water if conscious and able to swallow. Heat stroke is life-threatening — cool the person fast, every minute matters."
     ),
+    KnowledgeEntry(
+        keywords = listOf("drowning", "near drowning", "pulled from water", "swallowed water"),
+        category = ChatbotCategory.FIRST_AID,
+        answer = "🩹 Near-drowning: Get person out of water safely. If unconscious and not breathing: start CPR immediately (30 compressions, 2 breaths). Do NOT try to drain water by shaking or pressing the abdomen — it wastes time and causes injury. Place in recovery position once breathing resumes. All near-drowning victims need hospital evaluation even if they seem fine."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("choking", "airway", "blocked throat", "heimlich", "can't breathe"),
+        category = ChatbotCategory.FIRST_AID,
+        answer = "🩹 Choking adult: Ask 'Are you choking?' — if they can't speak/cough/breathe, act immediately. Stand behind them, give 5 firm back blows between shoulder blades with the heel of your hand. Then 5 abdominal thrusts (Heimlich): hands above navel, thrust sharply inward-upward. Alternate until object dislodges or they lose consciousness. For infants: face-down back blows only."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("infection", "wound infection", "pus", "swollen wound", "fever wound"),
+        category = ChatbotCategory.FIRST_AID,
+        answer = "🩹 Wound infection signs: Increasing redness, warmth, swelling, pus, red streaks spreading from the wound, or fever. Clean with boiled (cooled) water and cover with a clean cloth. Change dressing twice daily. If red streaks appear (spreading up a limb), this is a medical emergency — seek help immediately; sepsis can be fatal within hours."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("crush injury", "trapped", "rubble", "collapsed building", "buried"),
+        category = ChatbotCategory.FIRST_AID,
+        answer = "🩹 Crush injury (collapsed building): Do NOT move a person who has been trapped for more than 15 minutes without medical guidance — sudden release can cause fatal cardiac arrest from 'crush syndrome'. Keep them conscious and talking. If they must be moved immediately for safety, do so gently and be prepared for collapse. Prioritise airway and external bleeding control."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("hypothermia", "freezing", "cold exposure", "shivering uncontrollably"),
+        category = ChatbotCategory.FIRST_AID,
+        answer = "🩹 Hypothermia: Signs — uncontrollable shivering, confusion, slurred speech, stumbling, then shivering stops (severe stage). Move person to shelter. Remove wet clothing. Warm the core first: chest, neck, armpits, groin — not limbs. Use body heat, blankets, or warm (not hot) drinks if conscious. Handle gently — cold hearts are prone to cardiac arrest from sudden movement."
+    ),
 
     // ── SHELTER ───────────────────────────────────────────────────────────────
     KnowledgeEntry(
@@ -168,6 +233,31 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         category = ChatbotCategory.SHELTER,
         answer = "🏕️ Post-earthquake shelter: Do NOT re-enter damaged buildings — aftershocks can collapse weakened structures. Open spaces away from buildings and power lines are safest. If outdoors during shaking: drop, cover, hold. After: check for gas leaks (smell), electrical fires, and structural damage before entering."
     ),
+    KnowledgeEntry(
+        keywords = listOf("cyclone", "hurricane", "typhoon", "strong wind", "storm"),
+        category = ChatbotCategory.SHELTER,
+        answer = "🏕️ Cyclone shelter: Move to the strongest room in the building — an interior room on the lowest floor, away from windows. Lie flat under a heavy table or mattress. After the eye passes, the storm WILL resume — do not go outside. Avoid coastlines and riverbanks for 24 hours after landfall due to storm surge risk."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("landslide", "mudslide", "hillside", "slope collapse"),
+        category = ChatbotCategory.SHELTER,
+        answer = "🏕️ Landslide: If you hear a rumble or see trees leaning or cracks in hillside, evacuate immediately to high, flat ground — not the top of a hill. Move perpendicular to the slide path, not up the slope. If escape is impossible, curl into a ball and protect your head. Never shelter below steep slopes during heavy rain."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("relief camp", "refugee camp", "evacuation centre", "camp hygiene"),
+        category = ChatbotCategory.SHELTER,
+        answer = "🏕️ Relief camp hygiene: Keep sleeping area clean and dry. Use designated toilet areas only — open defecation spreads cholera and typhoid rapidly in camps. Wash hands before eating and after toilet use, even with minimal water. Report illness to camp health workers immediately — disease spreads fast in crowded shelters."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("gas leak", "lpg", "smell gas", "cylinder", "pipeline"),
+        category = ChatbotCategory.SHELTER,
+        answer = "🏕️ Gas leak: Do NOT switch any lights, fans, or switches on or off — sparks ignite gas. Do NOT use your phone inside the building. Open all doors and windows, leave immediately, and leave the door open behind you. Shut off the gas cylinder valve if safely reachable. Call emergency services from outside."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("electricity", "live wire", "power line", "electrocution", "electric shock"),
+        category = ChatbotCategory.SHELTER,
+        answer = "🏕️ Downed power lines: Assume all fallen lines are live. Stay at least 10 metres away. If a live wire touches your vehicle, stay inside — the car is safer than the ground. If you must exit, jump clear without touching the car and ground simultaneously, then shuffle away with feet together. Never touch someone being electrocuted — cut the power first."
+    ),
 
     // ── EVACUATION ────────────────────────────────────────────────────────────
     KnowledgeEntry(
@@ -194,6 +284,31 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         keywords = listOf("car", "vehicle", "drive", "flood car", "trapped in car"),
         category = ChatbotCategory.EVACUATION,
         answer = "🚨 Vehicle in flood: Never drive through moving floodwater — 15 cm can sweep a car off the road. If your car stalls in water: exit immediately, move to high ground. If trapped inside a submerged car: wait for water to equalise pressure, open door, swim to surface. Keep a window punch tool in your car."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("elderly", "disabled", "wheelchair", "mobility", "special needs evacuation"),
+        category = ChatbotCategory.EVACUATION,
+        answer = "🚨 Evacuating with elderly or disabled persons: Identify neighbours who may need help before a disaster strikes. For wheelchair users: carry chairs down stairs only if lifts are unavailable — use a carry chair or evacuation chair. Pre-register mobility-impaired persons with local disaster authorities so rescue teams are aware. Never leave them alone in a damaged building."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("cattle", "animals", "livestock", "pets", "dog cat"),
+        category = ChatbotCategory.EVACUATION,
+        answer = "🚨 Evacuating with animals: Move livestock to high ground early — they sense danger. Small pets: place in carriers. Large animals: open gates if you cannot take them — they may survive free better than trapped. Do NOT re-enter dangerous areas to rescue animals. Microchip or tag animals with your contact before disaster season."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("night evacuation", "dark", "no light", "evacuate at night"),
+        category = ChatbotCategory.EVACUATION,
+        answer = "🚨 Night evacuation: Use a flashlight or phone torch — never use open flame near gas leaks or flood debris. Move slowly and check every step. Mark your path with torn cloth tied to branches if possible. Stay on known roads — unfamiliar terrain at night causes falls and injuries. If possible, wait for first light unless immediate danger is present."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("tsunami", "tidal wave", "sea receding", "ocean wave"),
+        category = ChatbotCategory.EVACUATION,
+        answer = "🚨 Tsunami warning: If the sea suddenly recedes far from shore, or you feel a strong earthquake near the coast — RUN INLAND AND UPHILL IMMEDIATELY. Do not wait for official warning. A tsunami can arrive within minutes of an offshore quake. Move at least 30m above sea level or 3km inland. Do not return to the coast until authorities declare it safe — multiple waves can strike hours apart."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("children", "school", "kids evacuation", "child alone"),
+        category = ChatbotCategory.EVACUATION,
+        answer = "🚨 Children during evacuation: Do not send children ahead alone. Assign each child a buddy. Write your phone number on their arm with a marker. Schools have emergency protocols — if separated at school, go to the school's designated assembly point. Teach children to go to a uniformed official (police, NDRF, military) if lost."
     ),
 
     // ── SOS SIGNALS ──────────────────────────────────────────────────────────
@@ -226,6 +341,26 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
         keywords = listOf("phone", "battery", "low battery", "signal phone", "message"),
         category = ChatbotCategory.SOS_SIGNAL,
         answer = "📡 Phone in emergency: Even with no network signal, most phones can still call 112 (India emergency). Send SMS — texts use far less power than calls and may get through on congested networks. Enable airplane mode between check-ins to save battery. Charge via car USB, solar bank, or hand crank if available."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("night signal", "dark signal", "signal at night", "flashlight signal"),
+        category = ChatbotCategory.SOS_SIGNAL,
+        answer = "📡 Night signalling: A flashlight or phone torch can signal SOS at night: 3 short flashes, 3 long flashes, 3 short flashes — pause — repeat (Morse SOS). Rescue helicopters use FLIR (thermal cameras) at night — a fire or body heat in an open area is detectable. Stay in the open and keep moving gently to generate heat signature."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("flare", "signal flare", "rescue flare", "pyrotechnic"),
+        category = ChatbotCategory.SOS_SIGNAL,
+        answer = "📡 Signal flares: Hold flare at arm's length, pointing downwind and slightly away from you. Only fire when you can hear or see a rescue aircraft/vessel — flares last only 30–60 seconds. Keep the second flare for when rescuers are close enough to pinpoint your location. Store flares dry and check expiry dates annually."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("mesh network", "radio", "walkie talkie", "communicate", "no internet"),
+        category = ChatbotCategory.SOS_SIGNAL,
+        answer = "📡 Off-grid communication: This MeshRelief app communicates directly device-to-device via Wi-Fi Direct — no internet or towers needed. Ensure your mesh network is active and share your location via the Map tab. For longer range: civilian walkie-talkies work on VHF/UHF. NDRF uses 2182 kHz (marine distress) and 121.5 MHz (aviation distress) frequencies."
+    ),
+    KnowledgeEntry(
+        keywords = listOf("ndrf", "sdrf", "rescue team", "emergency number", "helpline", "112"),
+        category = ChatbotCategory.SOS_SIGNAL,
+        answer = "📡 India emergency contacts: 112 (unified national emergency — police, fire, ambulance). NDRF helpline: 011-24363260. State Disaster Management: contact your State DMA. Red Cross: 1800-180-5378 (toll free). If lines are busy, send a geo-tagged SMS to 112. Post your location on all available mesh channels in this app."
     )
 )
 

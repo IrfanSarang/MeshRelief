@@ -119,16 +119,23 @@ class SocketServer @Inject constructor() {
     private suspend fun handleClient(client: java.net.Socket) {
         try {
             client.use { socket ->
+                val clientIp = socket.inetAddress.hostAddress ?: return
+
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                val rawJson = reader.readLine()   // each packet is one line of JSON
+                val rawJson = reader.readLine()
 
                 if (rawJson.isNullOrBlank()) {
-                    Log.w(TAG, "Received empty payload — discarding.")
+                    Log.w(TAG, "Received empty payload from $clientIp — discarding.")
                     return
                 }
 
                 val packet: MeshPacket = json.decodeFromString(rawJson)
-                Log.d(TAG, "Received packet id=${packet.id} type=${packet.type}")
+
+                // ── Store IP as soon as we know the sender's deviceId ─────────
+                _peerIpRegistry[packet.senderId] = clientIp
+                Log.d(TAG, "Registered peer ${packet.senderId} → $clientIp")
+
+                Log.d(TAG, "Received packet id=${packet.id} type=${packet.type} from $clientIp")
                 _incomingPackets.emit(packet)
             }
         } catch (e: kotlinx.serialization.SerializationException) {
@@ -136,5 +143,25 @@ class SocketServer @Inject constructor() {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling client connection", e)
         }
+    }
+
+    // ── Peer IP registry ──────────────────────────────────────────────────────
+    // deviceId → IP string, updated on every accepted connection.
+    // ConcurrentHashMap keeps this safe across coroutines without locking.
+    private val _peerIpRegistry = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Read-only snapshot for ConnectionManager to address specific peers. */
+    val peerIpRegistry: Map<String, String> get() = _peerIpRegistry
+
+    /** Manually register a deviceId↔IP pair (e.g. from a handshake packet). */
+    fun registerPeer(deviceId: String, ip: String) {
+        _peerIpRegistry[deviceId] = ip
+        Log.d(TAG, "Peer registered: $deviceId → $ip")
+    }
+
+    /** Remove a peer when they disconnect. */
+    fun unregisterPeer(deviceId: String) {
+        _peerIpRegistry.remove(deviceId)
+        Log.d(TAG, "Peer unregistered: $deviceId")
     }
 }

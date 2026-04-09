@@ -9,6 +9,7 @@ import javax.inject.Singleton
 class PeerRepository @Inject constructor(private val dao: PeerDao) {
 
     fun getAllPeers() = dao.getAllPeers()
+    fun getVerified() = dao.getVerified()
 
     suspend fun upsert(peer: PeerEntity) = dao.upsert(peer)
 
