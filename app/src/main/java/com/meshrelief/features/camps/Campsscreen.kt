@@ -24,12 +24,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.meshrelief.R
 import com.meshrelief.features.home.BottomNavBar
-import com.meshrelief.features.home.MeshAmber
-import com.meshrelief.features.home.MeshDark
-import com.meshrelief.features.home.MeshGray
-import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshMid
-import com.meshrelief.features.home.MeshRed
+import com.meshrelief.ui.theme.MeshAmber
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenDark
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+import com.meshrelief.ui.theme.MeshRed
 
 enum class CampFilter {
     ALL, ACTIVE, FULL, NEARBY;

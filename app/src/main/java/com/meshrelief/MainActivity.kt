@@ -93,12 +93,15 @@ private fun LocationPermissionGate(content: @Composable () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        launcher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions += Manifest.permission.NEARBY_WIFI_DEVICES
+            permissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        launcher.launch(permissions.toTypedArray())
     }
 
     if (permissionResolved) {
@@ -158,7 +161,7 @@ fun AppRoot(
             onFirstAidClick   = { currentScreen = "firstaid" },
             onCampsClick      = { currentScreen = "camps" },
             onAdminClick      = { currentScreen = "admin" },
-            onFakeIncomingSos = {
+            onFakeIncomingSos = if (BuildConfig.DEBUG) ({
                 scope.launch {
                     AppEventBus.incomingSos.emit(
                         MeshPacket(
@@ -174,7 +177,7 @@ fun AppRoot(
                         )
                     )
                 }
-            }
+            }) else ({})
         )
 
         "sos" -> SOSScreen(

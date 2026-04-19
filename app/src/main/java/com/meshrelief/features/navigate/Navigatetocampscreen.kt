@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -30,27 +31,25 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.meshrelief.core.util.Constants
+import com.meshrelief.ui.theme.MeshAmber
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenDark
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+import com.meshrelief.ui.theme.MeshRed
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.compass.CompassOverlay
-import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
-import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenDark
-import com.meshrelief.features.home.MeshGreenLight
-import com.meshrelief.features.home.MeshGray
-import com.meshrelief.features.home.MeshDark
-import com.meshrelief.features.home.MeshMid
-import com.meshrelief.features.home.MeshAmber
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
-import androidx.compose.ui.graphics.toArgb
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,12 +62,21 @@ fun NavigateToCampScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Load camp data
     LaunchedEffect(campId) {
         viewModel.loadCamp(campId)
     }
 
-    // Register / unregister compass sensor with lifecycle
+    // ── Configure OSMDroid local cache (same paths as MapScreen/SetupViewModel) ─
+    LaunchedEffect(Unit) {
+        Configuration.getInstance().apply {
+            userAgentValue              = context.packageName
+            tileFileSystemCacheMaxBytes =
+                Constants.MAP_TILE_CACHE_MB * 1024L * 1024L           // 200 MB
+            osmdroidBasePath            = File(context.filesDir, "osmdroid")
+            osmdroidTileCache           = File(context.filesDir, "osmdroid/tiles")
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -81,7 +89,6 @@ fun NavigateToCampScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Animate compass needle rotation
     val animatedNeedle by animateFloatAsState(
         targetValue = state.compassHeadingDeg,
         animationSpec = tween(durationMillis = 200),
@@ -150,7 +157,6 @@ fun NavigateToCampScreen(
                 .padding(innerPadding)
         ) {
 
-            // ---- OSMDroid Map (55% height) ----
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,10 +164,10 @@ fun NavigateToCampScreen(
             ) {
                 if (state.isLoaded) {
                     OsmNavigationMap(
-                        userLat = state.userLatitude,
-                        userLng = state.userLongitude,
-                        campLat = state.campLatitude,
-                        campLng = state.campLongitude,
+                        userLat  = state.userLatitude,
+                        userLng  = state.userLongitude,
+                        campLat  = state.campLatitude,
+                        campLng  = state.campLongitude,
                         campName = state.campName
                     )
                 } else {
@@ -175,7 +181,7 @@ fun NavigateToCampScreen(
                     }
                 }
 
-                // Compass rose overlay (bottom-right corner)
+                // Compass rose
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -185,7 +191,6 @@ fun NavigateToCampScreen(
                         .background(Color.White.copy(alpha = 0.95f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Needle rotates with live heading
                     Text(
                         text = "\u2191",
                         fontSize = 22.sp,
@@ -206,7 +211,6 @@ fun NavigateToCampScreen(
                 }
             }
 
-            // ---- Bottom info panel ----
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -215,32 +219,17 @@ fun NavigateToCampScreen(
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-
-                // 3-column stat grid
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    StatBox(
-                        value = distanceText,
-                        label = "km away",
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBox(
-                        value = state.directionLabel,
-                        label = "direction",
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBox(
-                        value = walkLabel,
-                        label = "min walk",
-                        modifier = Modifier.weight(1f)
-                    )
+                    StatBox(value = distanceText,        label = "km away",   modifier = Modifier.weight(1f))
+                    StatBox(value = state.directionLabel, label = "direction", modifier = Modifier.weight(1f))
+                    StatBox(value = walkLabel,            label = "min walk",  modifier = Modifier.weight(1f))
                 }
 
                 Spacer(Modifier.height(4.dp))
 
-                // Bearing hint row
                 if (state.isLoaded) {
                     Row(
                         modifier = Modifier
@@ -264,7 +253,6 @@ fun NavigateToCampScreen(
 
                 Spacer(Modifier.height(4.dp))
 
-                // CTA button
                 Button(
                     onClick = { viewModel.startWalking() },
                     modifier = Modifier
@@ -273,39 +261,29 @@ fun NavigateToCampScreen(
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (state.isNavigating) MeshGreenDark else MeshGreen,
-                        contentColor = Color.White
+                        contentColor   = Color.White
                     )
                 ) {
                     if (state.isNavigating) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector     = Icons.Default.ArrowBack,
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .rotate(90f),
-                            tint = Color.White
+                            modifier        = Modifier.size(16.dp).rotate(90f),
+                            tint            = Color.White
                         )
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(
-                        text = ctaLabel,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(text = ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
 }
 
-// ---------- Reusable stat box ----------
+// ── Stat box ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StatBox(
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier
-) {
+private fun StatBox(value: String, label: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
@@ -314,23 +292,15 @@ private fun StatBox(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MeshDark,
-            textAlign = TextAlign.Center
+            text = value, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            color = MeshDark, textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = MeshMid,
-            textAlign = TextAlign.Center
-        )
+        Text(text = label, fontSize = 10.sp, color = MeshMid, textAlign = TextAlign.Center)
     }
 }
 
-// ---------- OSMDroid map composable ----------
+// ── OSMDroid map composable ───────────────────────────────────────────────────
 
 @Composable
 private fun OsmNavigationMap(
@@ -340,26 +310,23 @@ private fun OsmNavigationMap(
     campLng: Double,
     campName: String
 ) {
-    val context = LocalContext.current
+    val context       = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val mapView = remember {
-        Configuration.getInstance().load(
-            context,
-            context.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
-        )
         MapView(context).apply {
-            setTileSource(TileSourceFactory.DEFAULT_TILE_SOURCE)
+            setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            // ── Offline-only: read from local cache, never hit the network ──
+            setUseDataConnection(false)
         }
     }
 
-    // Lifecycle handling for map
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME  -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE   -> mapView.onPause()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE  -> mapView.onPause()
                 else -> Unit
             }
         }
@@ -379,104 +346,83 @@ private fun OsmNavigationMap(
             val userPoint = GeoPoint(userLat, userLng)
             val campPoint = GeoPoint(campLat, campLng)
 
-            // ---- Dashed polyline user → camp ----
+            // Dashed polyline
             val polyline = Polyline(map).apply {
                 setPoints(listOf(userPoint, campPoint))
-                outlinePaint.color = MeshGreen.toArgb()
+                outlinePaint.color       = MeshGreen.toArgb()
                 outlinePaint.strokeWidth = 6f
-                outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
+                outlinePaint.pathEffect  = DashPathEffect(floatArrayOf(18f, 12f), 0f)
                 outlinePaint.isAntiAlias = true
-                outlinePaint.style = Paint.Style.STROKE
+                outlinePaint.style       = Paint.Style.STROKE
             }
             map.overlays.add(polyline)
 
-            // ---- User marker (blue dot) ----
-            val userMarker = Marker(map).apply {
+            // User marker
+            map.overlays.add(Marker(map).apply {
                 position = userPoint
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 title = "You"
-                icon = buildBlueDotDrawable(context)
-            }
-            map.overlays.add(userMarker)
+                icon  = buildBlueDotDrawable(context)
+            })
 
-            // ---- Camp marker (green pin) ----
-            val campMarker = Marker(map).apply {
+            // Camp marker
+            map.overlays.add(Marker(map).apply {
                 position = campPoint
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = campName
+                title   = campName
                 snippet = "Relief camp"
-                icon = buildGreenPinDrawable(context)
-            }
-            map.overlays.add(campMarker)
+                icon    = buildGreenPinDrawable(context)
+            })
 
-            // ---- Zoom to show both points ----
-            val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(
-                listOf(userPoint, campPoint)
-            )
-            map.post {
-                map.zoomToBoundingBox(boundingBox, true, 80)
-            }
+            // Zoom to fit both points
+            val boundingBox = BoundingBox.fromGeoPoints(listOf(userPoint, campPoint))
+            map.post { map.zoomToBoundingBox(boundingBox, true, 80) }
         }
     )
 }
 
-// ---------- Marker bitmap builders ----------
+// ── Marker builders ───────────────────────────────────────────────────────────
 
 private fun buildBlueDotDrawable(context: android.content.Context): android.graphics.drawable.Drawable {
-    val size = 36
+    val size   = 36
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bitmap)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#378ADD")
-        style = Paint.Style.FILL
-    }
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.WHITE
-        style = Paint.Style.FILL
-    }
-    val cx = size / 2f
-    val cy = size / 2f
-    canvas.drawCircle(cx, cy, cx, borderPaint)
-    canvas.drawCircle(cx, cy, cx - 4f, paint)
+    val cx = size / 2f; val cy = size / 2f
+    canvas.drawCircle(cx, cy, cx, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE; style = Paint.Style.FILL
+    })
+    canvas.drawCircle(cx, cy, cx - 4f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#378ADD"); style = Paint.Style.FILL
+    })
     return BitmapDrawable(context.resources, bitmap)
 }
 
 private fun buildGreenPinDrawable(context: android.content.Context): android.graphics.drawable.Drawable {
-    val w = 40
-    val h = 50
+    val w = 40; val h = 50
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bitmap)
 
     val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#1D9E75")
-        style = Paint.Style.FILL
+        color = AndroidColor.parseColor("#1D9E75"); style = Paint.Style.FILL
     }
     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.parseColor("#085041")
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
+        style = Paint.Style.STROKE; strokeWidth = 2f
     }
-    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.WHITE
-        style = Paint.Style.FILL
-    }
-
-    // Rounded rect body
     val rect = android.graphics.RectF(2f, 2f, w - 2f, h - 14f)
     canvas.drawRoundRect(rect, 10f, 10f, bodyPaint)
     canvas.drawRoundRect(rect, 10f, 10f, borderPaint)
 
-    // Triangle tip
-    val tipPath = Path().apply {
+    canvas.drawPath(Path().apply {
         moveTo(w / 2f - 8f, h - 14f)
         lineTo(w / 2f + 8f, h - 14f)
         lineTo(w / 2f, h.toFloat())
         close()
-    }
-    canvas.drawPath(tipPath, bodyPaint)
+    }, bodyPaint)
 
-    // White dot
-    canvas.drawCircle(w / 2f, (h - 14f) / 2f, 6f, dotPaint)
+    canvas.drawCircle(w / 2f, (h - 14f) / 2f, 6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE; style = Paint.Style.FILL
+    })
 
     return BitmapDrawable(context.resources, bitmap)
 }

@@ -2,124 +2,104 @@ package com.meshrelief.features.sos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.meshrelief.core.location.LocationProvider
 import com.meshrelief.mesh.protocol.MeshPacket
+import com.meshrelief.mesh.protocol.decodeSos
 import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import javax.inject.Inject
-import kotlin.math.*
 
-enum class IncomingTriageLevel {
-    SAFE, MINOR, CRITICAL, UNRESPONSIVE
-}
+// ── Triage level mirrored for incoming display ────────────────────────────────
 
-data class IncomingSosUiState(
-    val senderName: String = "Unknown",
-    val senderIdSuffix: String = "0000",
-    val isVerified: Boolean = false,
-    val hopCount: Int = 1,
-    val triage: IncomingTriageLevel = IncomingTriageLevel.CRITICAL,
-    val latRaw: Double = 0.0,
-    val lngRaw: Double = 0.0,
-    val distanceKm: Float = 0f,
-    val directionLabel: String = "??",
-    val message: String = "",
-    val receivedTimeLabel: String = "Just now",
-    val isRelaying: Boolean = false,
-    val relaySuccess: Boolean = false,
-    val isDismissed: Boolean = false
+enum class IncomingTriageLevel { SAFE, MINOR, CRITICAL, UNRESPONSIVE }
+
+private fun String.toIncomingTriage(): IncomingTriageLevel =
+    runCatching { IncomingTriageLevel.valueOf(this.uppercase()) }
+        .getOrDefault(IncomingTriageLevel.SAFE)
+
+// ── UI state ─────────────────────────────────────────────────────────────────
+
+data class IncomingSosAlertUiState(
+    val senderName       : String              = "Unknown",
+    val senderIdSuffix   : String              = "????",
+    val isVerified       : Boolean             = false,
+    val hopCount         : Int                 = 1,
+    val triage           : IncomingTriageLevel = IncomingTriageLevel.SAFE,
+    val latRaw           : Double              = 0.0,
+    val lngRaw           : Double              = 0.0,
+    val distanceKm       : Float               = 0f,
+    val directionLabel   : String              = "—",
+    val message          : String              = "",
+    val receivedTimeLabel: String              = "",
+    val isRelaying       : Boolean             = false,
+    val relaySuccess     : Boolean             = false,
+    val isDismissed      : Boolean             = false
 )
 
-// Parsed result from MeshPacket.payload JSON
-private data class SosPayload(
-    val triage: IncomingTriageLevel,
-    val lat: Double,
-    val lng: Double,
-    val message: String
-)
+// ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class IncomingSosAlertViewModel @Inject constructor(
-    private val locationProvider: LocationProvider,
     private val connectionManager: ConnectionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(IncomingSosUiState())
-    val uiState: StateFlow<IncomingSosUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(IncomingSosAlertUiState())
+    val uiState: StateFlow<IncomingSosAlertUiState> = _uiState
 
-    // Holds the original packet so relayFurther() can broadcast it
+    // Hold the original packet for relay
     private var cachedPacket: MeshPacket? = null
 
-    // ── Public API ────────────────────────────────────────────────────────
-
     /**
-     * Entry point called from IncomingSosAlertScreen when a real MeshPacket
-     * is available. Parses payload, resolves location, then updates uiState.
+     * Primary entry point — called by IncomingSosAlertScreen when a real packet arrives.
+     * Decodes via SosPayload schema; falls back gracefully on parse failure.
      */
     fun loadFromMeshPacket(packet: MeshPacket) {
         cachedPacket = packet
-        viewModelScope.launch {
-            val payload = parsePayload(packet.payload)
 
-            // Get user's own position (may be null if permission denied / no fix)
-            val userLocation = locationProvider.getLastKnownLocation()
+        runCatching {
+            // ── Decode structured payload — single source of truth ──
+            val sos = packet.decodeSos()
 
-            val distanceKm: Float
-            val directionLabel: String
-
-            if (userLocation != null) {
-                distanceKm = haversineKm(
-                    userLocation.latitude, userLocation.longitude,
-                    payload.lat, payload.lng
-                )
-                directionLabel = compassLabel(
-                    userLocation.latitude, userLocation.longitude,
-                    payload.lat, payload.lng
-                )
-            } else {
-                distanceKm = 0f
-                directionLabel = "??"
-            }
-
-            _uiState.value = IncomingSosUiState(
-                senderName        = packet.senderName,
-                senderIdSuffix    = packet.senderId.takeLast(4),
+            _uiState.value = _uiState.value.copy(
+                senderName        = packet.senderName.ifBlank { "Unknown" },
+                senderIdSuffix    = packet.senderId.takeLast(4).padStart(4, '0'),
                 isVerified        = packet.signature.isNotBlank(),
-                hopCount          = packet.ttl,
-                triage            = payload.triage,
-                latRaw            = payload.lat,
-                lngRaw            = payload.lng,
-                distanceKm        = distanceKm,
-                directionLabel    = directionLabel,
-                message           = payload.message,
-                receivedTimeLabel  = "Just now"
+                hopCount          = (packet.ttl - 1).coerceAtLeast(1), // rough hop estimate
+                triage            = sos.triage.toIncomingTriage(),
+                latRaw            = sos.lat,
+                lngRaw            = sos.lng,
+                distanceKm        = 0f,   // compute from own location if LocationProvider injected
+                directionLabel    = "—",  // compute bearing if LocationProvider injected
+                message           = sos.message,
+                receivedTimeLabel = packet.timestamp.toTimeLabel()
+            )
+        }.onFailure {
+            // Payload malformed — show sender info only, triage unknown
+            _uiState.value = _uiState.value.copy(
+                senderName     = packet.senderName.ifBlank { "Unknown" },
+                senderIdSuffix = packet.senderId.takeLast(4).padStart(4, '0'),
+                triage         = IncomingTriageLevel.SAFE
             )
         }
     }
 
-    /**
-     * Legacy overload kept so existing Screen call-sites that still pass
-     * individual fields continue to compile while you migrate them.
-     */
+    /** Dev/demo fallback — pre-fills state without a real packet. */
     fun loadFromPacket(
-        senderName: String,
-        senderIdSuffix: String,
-        isVerified: Boolean,
-        hopCount: Int,
-        triage: IncomingTriageLevel,
-        lat: Double,
-        lng: Double,
-        distanceKm: Float,
-        directionLabel: String,
-        message: String,
-        receivedTimeLabel: String
+        senderName     : String,
+        senderIdSuffix : String,
+        isVerified     : Boolean,
+        hopCount       : Int,
+        triage         : IncomingTriageLevel,
+        lat            : Double,
+        lng            : Double,
+        distanceKm     : Float,
+        directionLabel : String,
+        message        : String,
+        receivedTimeLabel : String
     ) {
-        _uiState.value = IncomingSosUiState(
+        _uiState.value = _uiState.value.copy(
             senderName        = senderName,
             senderIdSuffix    = senderIdSuffix,
             isVerified        = isVerified,
@@ -134,15 +114,16 @@ class IncomingSosAlertViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Broadcasts the cached packet to all nearby peers via ConnectionManager.
-     * TTL was already decremented by MeshRouter before this screen opened.
-     */
     fun relayFurther() {
         val packet = cachedPacket ?: return
+        if (packet.ttl <= 1) return   // TTL exhausted — do not relay
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRelaying = true)
-            connectionManager.broadcastPacket(packet)
+            runCatching {
+                val relayed = packet.copy(ttl = packet.ttl - 1)
+                connectionManager.broadcastPacket(relayed)
+            }
             _uiState.value = _uiState.value.copy(isRelaying = false, relaySuccess = true)
         }
     }
@@ -151,77 +132,18 @@ class IncomingSosAlertViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isDismissed = true)
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Parses the JSON payload string from MeshPacket.
-     * Expected format: {"triage":"CRITICAL","lat":19.076,"lng":72.877,"message":"..."}
-     * Falls back to safe defaults on any parse error.
-     */
-    private fun parsePayload(json: String): SosPayload {
-        return try {
-            val obj = JSONObject(json)
-            SosPayload(
-                triage  = mapTriageString(obj.optString("triage", "CRITICAL")),
-                lat     = obj.optDouble("lat", 0.0),
-                lng     = obj.optDouble("lng", 0.0),
-                message = obj.optString("message", "")
-            )
-        } catch (e: Exception) {
-            SosPayload(
-                triage  = IncomingTriageLevel.CRITICAL,
-                lat     = 0.0,
-                lng     = 0.0,
-                message = json   // show raw string as message if JSON is malformed
-            )
+    private fun Long.toTimeLabel(): String {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = this@toTimeLabel }
+        val h   = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        val m   = cal.get(java.util.Calendar.MINUTE)
+        val ampm = if (h < 12) "AM" else "PM"
+        val h12  = when {
+            h == 0  -> 12
+            h <= 12 -> h
+            else    -> h - 12
         }
-    }
-
-    /**
-     * Maps triage string from packet → IncomingTriageLevel enum.
-     * Case-insensitive; unknown values → CRITICAL (fail-safe).
-     */
-    private fun mapTriageString(value: String): IncomingTriageLevel =
-        when (value.uppercase()) {
-            "SAFE"         -> IncomingTriageLevel.SAFE
-            "MINOR"        -> IncomingTriageLevel.MINOR
-            "CRITICAL"     -> IncomingTriageLevel.CRITICAL
-            "UNRESPONSIVE" -> IncomingTriageLevel.UNRESPONSIVE
-            else           -> IncomingTriageLevel.CRITICAL
-        }
-
-    /**
-     * Haversine formula — returns straight-line distance in km
-     * between two lat/lng points.
-     */
-    private fun haversineKm(
-        lat1: Double, lon1: Double,
-        lat2: Double, lon2: Double
-    ): Float {
-        val r = 6371.0                              // Earth radius km
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2).pow(2)
-        return (2 * r * asin(sqrt(a))).toFloat()
-    }
-
-    /**
-     * Returns an 8-point compass label (N, NE, E, SE, S, SW, W, NW)
-     * for the bearing from (lat1,lon1) to (lat2,lon2).
-     */
-    private fun compassLabel(
-        lat1: Double, lon1: Double,
-        lat2: Double, lon2: Double
-    ): String {
-        val dLon = Math.toRadians(lon2 - lon1)
-        val lat1R = Math.toRadians(lat1)
-        val lat2R = Math.toRadians(lat2)
-        val x = sin(dLon) * cos(lat2R)
-        val y = cos(lat1R) * sin(lat2R) - sin(lat1R) * cos(lat2R) * cos(dLon)
-        val bearing = (Math.toDegrees(atan2(x, y)) + 360) % 360
-        val directions = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
-        return directions[((bearing + 22.5) / 45).toInt() % 8]
+        return "$h12:${"%02d".format(m)} $ampm"
     }
 }

@@ -9,6 +9,7 @@ import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meshrelief.core.location.LocationProvider
+import com.meshrelief.data.repository.CampRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +42,9 @@ data class NavigateToCampUiState(
 @HiltViewModel
 class NavigateToCampViewModel @Inject constructor(
     application: Application,
-    private val locationProvider: LocationProvider
+    private val locationProvider: LocationProvider,
+    // ── Issue 18 fix: inject real repository instead of using stubCamps ──────
+    private val campRepository: CampRepository
 ) : AndroidViewModel(application), SensorEventListener {
 
     private val _uiState = MutableStateFlow(NavigateToCampUiState())
@@ -52,35 +55,38 @@ class NavigateToCampViewModel @Inject constructor(
     private val rotationVectorSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    // Stub camp list — real data wired in Issue #4/#5
-    private val stubCamps = listOf(
-        mapOf(
-            "id" to "camp_001",
-            "name" to "St. Xavier School",
-            "type" to "Food & Rest",
-            "lat" to 19.0821,
-            "lng" to 72.8697
+    // ── Issue 18 fix: temporary fallback matching CampDetailViewModel exactly ─
+    // IDs and coordinates are kept in sync with CampDetailViewModel's allCamps.
+    // Remove this block once Room is seeded via Issue 6/7.
+    private data class FallbackCamp(
+        val id: String,
+        val name: String,
+        val type: String,
+        val lat: Double,
+        val lng: Double
+    )
+
+    private val fallbackCamps = listOf(
+        FallbackCamp(
+            id   = "camp_1",
+            name = "Nagpur Central Relief Camp",
+            type = "Food & Shelter",
+            lat  = 21.1458,
+            lng  = 79.0882
         ),
-        mapOf(
-            "id" to "camp_002",
-            "name" to "Don Bosco Ground",
-            "type" to "Medical + Shelter",
-            "lat" to 19.0680,
-            "lng" to 72.8350
+        FallbackCamp(
+            id   = "camp_2",
+            name = "Amravati District Camp",
+            type = "Medical + Shelter",
+            lat  = 20.9374,
+            lng  = 77.7796
         ),
-        mapOf(
-            "id" to "camp_003",
-            "name" to "Azad Maidan Camp",
-            "type" to "Shelter & Supply",
-            "lat" to 18.9334,
-            "lng" to 72.8280
-        ),
-        mapOf(
-            "id" to "camp_004",
-            "name" to "NSCI Dome Relief Centre",
-            "type" to "Medical Camp",
-            "lat" to 19.0176,
-            "lng" to 72.8562
+        FallbackCamp(
+            id   = "camp_3",
+            name = "Wardha Relief Centre",
+            type = "Shelter & Supply",
+            lat  = 20.7453,
+            lng  = 78.6022
         )
     )
 
@@ -101,7 +107,7 @@ class NavigateToCampViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isLocating = true)
         val fix = locationProvider.getLastKnownLocation()
         _uiState.value = _uiState.value.copy(
-            userLatitude = fix?.latitude ?: _uiState.value.userLatitude,
+            userLatitude  = fix?.latitude  ?: _uiState.value.userLatitude,
             userLongitude = fix?.longitude ?: _uiState.value.userLongitude,
             isLocating = false
         )
@@ -113,27 +119,49 @@ class NavigateToCampViewModel @Inject constructor(
             // is as fresh as possible when the user opens this screen.
             fetchUserLocation()
 
-            val camp = stubCamps.find { it["id"] == campId } ?: stubCamps.first()
-            val campLat = camp["lat"] as Double
-            val campLng = camp["lng"] as Double
+            // ── Issue 18 fix: query Room first; fall back to in-memory list ──
+            // Once Issue 6/7 seeds the DB, campRepository.getById() will always
+            // return a real entity and the fallback block will never be reached.
+            val entity = campRepository.getById(campId)
+
+            val campLat: Double
+            val campLng: Double
+            val campName: String
+            val campType: String
+
+            if (entity != null) {
+                campLat  = entity.lat
+                campLng  = entity.lng
+                campName = entity.name
+                campType = entity.type
+            } else {
+                // Fallback: same data as CampDetailViewModel — IDs now match
+                val fallback = fallbackCamps.find { it.id == campId }
+                    ?: fallbackCamps.first()
+                campLat  = fallback.lat
+                campLng  = fallback.lng
+                campName = fallback.name
+                campType = fallback.type
+            }
+
             val userLat = _uiState.value.userLatitude
             val userLng = _uiState.value.userLongitude
 
-            val distance = haversineKm(userLat, userLng, campLat, campLng)
-            val bearing = bearingDeg(userLat, userLng, campLat, campLng)
+            val distance  = haversineKm(userLat, userLng, campLat, campLng)
+            val bearing   = bearingDeg(userLat, userLng, campLat, campLng)
             val direction = compassLabel(bearing)
-            val walkMin = (distance / 0.067).roundToInt() // ~4 km/h
+            val walkMin   = (distance / 0.067).roundToInt() // ~4 km/h
 
             _uiState.value = _uiState.value.copy(
-                campName = camp["name"] as String,
-                campType = camp["type"] as String,
-                campLatitude = campLat,
+                campName      = campName,
+                campType      = campType,
+                campLatitude  = campLat,
                 campLongitude = campLng,
-                distanceKm = (distance * 10).roundToInt() / 10.0,
+                distanceKm    = (distance * 10).roundToInt() / 10.0,
                 directionLabel = direction,
                 estimatedMinutes = walkMin,
-                bearingDeg = bearing,
-                isLoaded = true
+                bearingDeg    = bearing,
+                isLoaded      = true
             )
         }
     }

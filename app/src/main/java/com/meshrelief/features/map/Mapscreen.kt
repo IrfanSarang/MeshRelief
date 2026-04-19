@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.WifiOff              // ← NEW
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,15 +32,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.meshrelief.core.model.TriageStatus
 import com.meshrelief.features.home.BottomNavBar
-import com.meshrelief.features.home.MeshAmber
-import com.meshrelief.features.home.MeshDark
-import com.meshrelief.features.home.MeshGray
-import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenDark
-import com.meshrelief.features.home.MeshGreenLight
-import com.meshrelief.features.home.MeshMid
-import com.meshrelief.features.home.MeshRed
-import org.osmdroid.config.Configuration
+import com.meshrelief.ui.theme.MeshAmber
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenDark
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+import com.meshrelief.ui.theme.MeshRed
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -85,7 +85,7 @@ private fun campPinDrawable(context: Context): Drawable {
     val totalH = squareSide + stemHeight
     val totalW = squareSide + 4
 
-    val campColor = android.graphics.Color.parseColor("#1D9E75") // MeshGreen
+    val campColor = android.graphics.Color.parseColor("#1D9E75")
 
     return object : Drawable() {
         private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = campColor }
@@ -107,11 +107,9 @@ private fun campPinDrawable(context: Context): Drawable {
             val bottom = squareSide.toFloat()
             val cx = bounds.exactCenterX()
 
-            // Square body
             canvas.drawRect(left, top, right, bottom, fillPaint)
             canvas.drawRect(left, top, right, bottom, strokePaint)
 
-            // Stem
             val stemPath = Path().apply {
                 moveTo(cx - 4 * density, bottom)
                 lineTo(cx, totalH.toFloat())
@@ -120,7 +118,6 @@ private fun campPinDrawable(context: Context): Drawable {
             }
             canvas.drawPath(stemPath, fillPaint)
 
-            // White cross (tent / camp symbol)
             val pad = 5 * density
             canvas.drawLine(cx, top + pad, cx, bottom - pad, crossPaint)
             canvas.drawLine(left + pad, (top + bottom) / 2, right - pad, (top + bottom) / 2, crossPaint)
@@ -155,12 +152,14 @@ fun MapScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // Keep a reference to the MapView so the FAB can animate the camera
+    // ── NEW: observe tile download flag ───────────────────────────────────────
+    val mapTilesDownloaded by viewModel.mapTilesDownloaded.collectAsState()
+
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
-    // Initialize OSMDroid configuration (user agent required by OSMDroid)
+    // ── CHANGED: replaced plain userAgentValue init with full OSMDroid config ─
     LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
+        viewModel.configureOsmDroid(context)
     }
 
     Scaffold(
@@ -193,6 +192,12 @@ fun MapScreen(
                         controller.setCenter(
                             uiState.userLocation ?: GeoPoint(19.0760, 72.8777)
                         )
+                        // ── NEW: disable live network tile fetching ────────
+                        // OSMDroid will only read from the local tile cache.
+                        // Tiles downloaded during setup will still render;
+                        // uncached areas show as blank until tiles are fetched.
+                        setUseDataConnection(false)
+
                         mapViewRef = this
                     }
                 },
@@ -249,70 +254,97 @@ fun MapScreen(
                 color = MeshGreenDark.copy(alpha = 0.93f),
                 shadowElevation = 4.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Mesh Map",
-                            color = androidx.compose.ui.graphics.Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Offline • OpenStreetMap",
-                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    // Peer count badge
+                Column {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MeshGreen
+                        Column {
+                            Text(
+                                text = "Mesh Map",
+                                color = androidx.compose.ui.graphics.Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Offline • OpenStreetMap",
+                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MeshGreen
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(androidx.compose.ui.graphics.Color.White, CircleShape)
-                                )
-                                Text(
-                                    text = "${uiState.peers.size} peers",
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(
+                                                androidx.compose.ui.graphics.Color.White,
+                                                CircleShape
+                                            )
+                                    )
+                                    Text(
+                                        text = "${uiState.peers.size} peers",
+                                        color = androidx.compose.ui.graphics.Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.toggleLegend() },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(MeshGreen.copy(alpha = 0.3f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Legend",
+                                    tint = androidx.compose.ui.graphics.Color.White,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
+                    }
 
-                        // Legend toggle button
-                        IconButton(
-                            onClick = { viewModel.toggleLegend() },
+                    // ── NEW: offline tiles warning banner ──────────────────
+                    // Shown only when MAP_TILES_DOWNLOADED == false.
+                    // Sits just below the title row, inside the same Surface.
+                    if (!mapTilesDownloaded) {
+                        Row(
                             modifier = Modifier
-                                .size(36.dp)
-                                .background(
-                                    MeshGreen.copy(alpha = 0.3f),
-                                    CircleShape
-                                )
+                                .fillMaxWidth()
+                                .background(MeshAmber.copy(alpha = 0.92f))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Legend",
+                                imageVector = Icons.Default.WifiOff,
+                                contentDescription = null,
                                 tint = androidx.compose.ui.graphics.Color.White,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Map tiles not downloaded. Connect to WiFi to download offline maps.",
+                                color = androidx.compose.ui.graphics.Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -377,12 +409,12 @@ private fun LegendCard() {
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
-            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF2979FF), label = "Your location", shape = "circle")
-            LegendRow(color = MeshGreen, label = "Peer — Stable (Green)", shape = "circle")
-            LegendRow(color = MeshAmber, label = "Peer — Caution (Amber)", shape = "circle")
-            LegendRow(color = MeshRed, label = "Peer — Critical (Red)", shape = "circle")
-            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF5F5E5A), label = "Peer — Unknown", shape = "circle")
-            LegendRow(color = MeshGreen, label = "Relief camp", shape = "square")
+            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF2979FF), label = "Your location",        shape = "circle")
+            LegendRow(color = MeshGreen,                                       label = "Peer — Stable (Green)", shape = "circle")
+            LegendRow(color = MeshAmber,                                       label = "Peer — Caution (Amber)",shape = "circle")
+            LegendRow(color = MeshRed,                                         label = "Peer — Critical (Red)", shape = "circle")
+            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF5F5E5A), label = "Peer — Unknown",        shape = "circle")
+            LegendRow(color = MeshGreen,                                       label = "Relief camp",           shape = "square")
         }
     }
 }

@@ -23,11 +23,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.meshrelief.R
-import com.meshrelief.features.home.MeshDark
-import com.meshrelief.features.home.MeshGray
-import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenLight
-import com.meshrelief.features.home.MeshMid
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+
+// ── Colour constants imported from com.meshrelief.ui.theme.AppColors ──────────
 
 private data class LanguageSelectionOption(
     val displayLabel: String,

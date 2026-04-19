@@ -6,8 +6,11 @@ import com.meshrelief.core.event.AppEventBus
 import com.meshrelief.data.db.entity.BulletinEntity
 import com.meshrelief.data.preferences.UserPreferences
 import com.meshrelief.data.repository.BulletinRepository
+import com.meshrelief.mesh.protocol.BulletinPayload
 import com.meshrelief.mesh.protocol.MeshPacket
 import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.protocol.decodeBulletin
+import com.meshrelief.mesh.protocol.encode
 import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -25,29 +28,29 @@ enum class BulletinCategory(val label: String) {
 }
 
 data class BulletinItem(
-    val id: String,
-    val senderName: String,
-    val category: BulletinCategory,
-    val message: String,
-    val timestampMillis: Long,
-    val isRelayed: Boolean
+    val id              : String,
+    val senderName      : String,
+    val category        : BulletinCategory,
+    val message         : String,
+    val timestampMillis : Long,
+    val isRelayed       : Boolean
 )
 
 data class BulletinUiState(
-    val bulletins: List<BulletinItem> = emptyList(),
-    val selectedFilter: BulletinCategory? = null,
-    val isSheetOpen: Boolean = false,
-    val composeCategory: BulletinCategory = BulletinCategory.GENERAL,
-    val composeText: String = ""
+    val bulletins        : List<BulletinItem>  = emptyList(),
+    val selectedFilter   : BulletinCategory?   = null,
+    val isSheetOpen      : Boolean             = false,
+    val composeCategory  : BulletinCategory    = BulletinCategory.GENERAL,
+    val composeText      : String              = ""
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class BulletinViewModel @Inject constructor(
-    private val repository: BulletinRepository,
-    private val connectionManager: ConnectionManager,
-    private val userPreferences: UserPreferences
+    private val repository      : BulletinRepository,
+    private val connectionManager : ConnectionManager,
+    private val userPreferences : UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BulletinUiState())
@@ -58,16 +61,14 @@ class BulletinViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getAllBulletins()
                 .map { entities -> entities.map { it.toBulletinItem() } }
-                .collect { items ->
-                    _uiState.update { it.copy(bulletins = items) }
-                }
+                .collect { items -> _uiState.update { it.copy(bulletins = items) } }
         }
 
         // 2. Collect incoming bulletin packets from the mesh
         viewModelScope.launch {
             AppEventBus.bulletin.collect { packet ->
                 val entity = packet.toBulletinEntity(isRelayed = true)
-                repository.save(entity)   // Room insert triggers the flow above automatically
+                repository.save(entity)
             }
         }
     }
@@ -93,7 +94,7 @@ class BulletinViewModel @Inject constructor(
 
     // ── Compose sheet ─────────────────────────────────────────────────────────
 
-    fun openSheet() = _uiState.update { it.copy(isSheetOpen = true) }
+    fun openSheet()  = _uiState.update { it.copy(isSheetOpen = true) }
 
     fun closeSheet() = _uiState.update {
         it.copy(isSheetOpen = false, composeText = "", composeCategory = BulletinCategory.GENERAL)
@@ -107,36 +108,36 @@ class BulletinViewModel @Inject constructor(
     }
 
     fun broadcast() {
-        val state = _uiState.value
+        val state   = _uiState.value
         val trimmed = state.composeText.trim()
         if (trimmed.isBlank()) return
 
         viewModelScope.launch {
-            // Read user identity (one-shot first value)
             val senderName = userPreferences.userName.first().ifBlank { "Unknown" }
             val senderId   = userPreferences.userDeviceId.first().ifBlank { UUID.randomUUID().toString() }
 
             val packetId  = UUID.randomUUID().toString()
             val timestamp = System.currentTimeMillis()
 
-            // a. Build the payload: "CATEGORY|message"
-            val payload = "${state.composeCategory.name}|$trimmed"
+            // ── Build payload via BulletinPayload — replaces fragile "CATEGORY|text" ──
+            val bulletinPayload = BulletinPayload(
+                category = state.composeCategory.name,
+                text     = trimmed
+            )
 
-            // b. Build MeshPacket and broadcast over mesh
             val packet = MeshPacket(
                 id          = packetId,
                 type        = PacketType.BULLETIN,
                 senderId    = senderId,
                 senderName  = senderName,
                 senderPhone = "",
-                payload     = payload,
+                payload     = bulletinPayload.encode(),
                 ttl         = 5,
                 timestamp   = timestamp,
-                signature   = ""   // ConnectionManager signs before sending
+                signature   = ""
             )
             connectionManager.broadcastPacket(packet)
 
-            // c. Persist locally (isRelayed = false → own post)
             val entity = BulletinEntity(
                 id         = packetId,
                 senderId   = senderId,
@@ -169,40 +170,42 @@ class BulletinViewModel @Inject constructor(
 
 // ─── Mapping extensions ───────────────────────────────────────────────────────
 
-/**
- * BulletinEntity.type is stored as the BulletinCategory name string.
- * Falls back to GENERAL if an unknown value arrives.
- */
 private fun BulletinEntity.toBulletinItem(): BulletinItem =
     BulletinItem(
-        id             = id,
-        senderName     = senderName,
-        category       = runCatching { BulletinCategory.valueOf(type) }
+        id              = id,
+        senderName      = senderName,
+        category        = runCatching { BulletinCategory.valueOf(type) }
             .getOrDefault(BulletinCategory.GENERAL),
-        message        = content,
+        message         = content,
         timestampMillis = timestamp,
-        isRelayed      = relayCount > 0
+        isRelayed       = relayCount > 0
     )
 
 /**
- * Incoming MeshPacket payload format: "CATEGORY|message text"
- * Falls back to GENERAL category if the prefix is missing/unknown.
+ * Decode incoming packet via BulletinPayload schema.
+ * Falls back gracefully if payload is legacy pipe-format or malformed.
  */
 private fun MeshPacket.toBulletinEntity(isRelayed: Boolean): BulletinEntity {
-    val parts    = payload.split("|", limit = 2)
-    val category = if (parts.size == 2)
-        runCatching { BulletinCategory.valueOf(parts[0]) }.getOrNull()?.name
-            ?: BulletinCategory.GENERAL.name
-    else
-        BulletinCategory.GENERAL.name
-    val content  = if (parts.size == 2) parts[1] else payload
+    val (category, text) = runCatching {
+        val p = decodeBulletin()
+        p.category to p.text
+    }.getOrElse {
+        // Legacy fallback: "CATEGORY|message" — remove once all clients updated
+        val parts = payload.split("|", limit = 2)
+        val cat   = if (parts.size == 2)
+            runCatching { BulletinCategory.valueOf(parts[0]) }.getOrNull()?.name
+                ?: BulletinCategory.GENERAL.name
+        else BulletinCategory.GENERAL.name
+        val txt = if (parts.size == 2) parts[1] else payload
+        cat to txt
+    }
 
     return BulletinEntity(
         id         = id,
         senderId   = senderId,
         senderName = senderName,
         type       = category,
-        content    = content,
+        content    = text,
         timestamp  = timestamp,
         relayCount = if (isRelayed) 1 else 0
     )

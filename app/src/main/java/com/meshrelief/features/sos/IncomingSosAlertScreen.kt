@@ -19,12 +19,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.meshrelief.features.home.MeshDark
-import com.meshrelief.features.home.MeshGray
-import com.meshrelief.features.home.MeshGreen
-import com.meshrelief.features.home.MeshGreenLight
-import com.meshrelief.features.home.MeshMid
-import com.meshrelief.features.home.MeshRed
+import com.meshrelief.ui.theme.MeshAmber
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenDark
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+import com.meshrelief.ui.theme.MeshRed
 
 private val SosDark = Color(0xFFA32D2D)
 private val SosLight = Color(0xFFFCEBEB)

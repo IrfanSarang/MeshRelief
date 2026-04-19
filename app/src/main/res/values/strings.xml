@@ -17,7 +17,7 @@
     <string name="home_no_peers">No peers connected yet</string>
     <string name="home_sos_button">SOS</string>
     <string name="home_sos_subtitle">Tap to broadcast emergency alert</string>
-    <string name="home_simulate_sos">Simulate Incoming SOS</string>
+
     <string name="home_stat_peers_online">Peers online</string>
     <string name="home_stat_peers_sublabel">%1$d verified · tap to scan</string>
     <string name="home_stat_nearby_camps">Nearby camps</string>

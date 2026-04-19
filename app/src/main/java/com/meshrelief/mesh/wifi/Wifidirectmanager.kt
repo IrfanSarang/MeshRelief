@@ -24,9 +24,13 @@ import javax.inject.Singleton
  * Manages WiFi P2P lifecycle: initialization, peer discovery, connection,
  * and disconnection. Exposes discovered peers as a [StateFlow].
  *
- * Must call [initialize] once (e.g. in MainActivity.onResume) and
- * [shutdown] once (e.g. in MainActivity.onPause) to correctly tie
- * the BroadcastReceiver to the activity lifecycle.
+ * Lifecycle is owned entirely by [MeshForegroundService]:
+ *   - [initialize] is called once in Service.onCreate()
+ *   - [shutdown]   is called once in Service.onDestroy()
+ *
+ * [initialize] is idempotent — safe to call multiple times; it returns
+ * early if already initialized. This prevents duplicate BroadcastReceiver
+ * registration and redundant peer discovery calls (Issue #17).
  */
 @Singleton
 class WifiDirectManager @Inject constructor(
@@ -40,6 +44,19 @@ class WifiDirectManager @Inject constructor(
         context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
 
     private var channel: Channel? = null
+
+    // ── Lifecycle guards (Issue #17) ──────────────────────────────────────
+    /**
+     * True once [initialize] has completed successfully.
+     * Prevents re-initialization on every Activity.onResume call.
+     */
+    private var isInitialized = false
+
+    /**
+     * True while the [BroadcastReceiver] is registered.
+     * Prevents double-registration and "Receiver not registered" crashes.
+     */
+    private var isReceiverRegistered = false
 
     // ── Peer list state ───────────────────────────────────────────────────
     private val _peerList = MutableStateFlow<List<WifiP2pDevice>>(emptyList())
@@ -154,32 +171,57 @@ class WifiDirectManager @Inject constructor(
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     /**
-     * Call from MainActivity.onResume (or a foreground Service).
-     * Initializes the P2P channel, registers the receiver, and
+     * Initializes the P2P channel, registers the BroadcastReceiver, and
      * triggers the first peer discovery pass.
+     *
+     * **Idempotent** — safe to call multiple times. Returns immediately if
+     * already initialized, preventing duplicate receiver registration and
+     * redundant discovery calls (Issue #17 fix).
+     *
+     * Should be called once from [MeshForegroundService.onCreate].
      */
     @SuppressLint("MissingPermission")
     fun initialize() {
+        if (isInitialized) {
+            Log.d(TAG, "initialize() called but already initialized — skipping.")
+            return
+        }
+
         channel = wifiP2pManager.initialize(context, context.mainLooper) {
-            // Called if the framework kills the channel — reinitialize
+            // Called if the framework kills the channel — reset flags and reinitialize.
+            // Flags are cleared first so the recursive call is allowed through.
             Log.w(TAG, "P2P channel disconnected; reinitializing.")
+            isInitialized = false
+            isReceiverRegistered = false
             initialize()
         }
-        context.registerReceiver(receiver, intentFilter)
+
+        if (!isReceiverRegistered) {
+            context.registerReceiver(receiver, intentFilter)
+            isReceiverRegistered = true
+        }
+
+        isInitialized = true
         Log.d(TAG, "WifiDirectManager initialized.")
         discoverPeers()
     }
 
     /**
-     * Call from MainActivity.onPause to unregister the receiver
-     * and avoid leaking it across the activity lifecycle.
+     * Unregisters the BroadcastReceiver and resets lifecycle state.
+     *
+     * Should be called once from [MeshForegroundService.onDestroy].
+     * Safe to call even if [initialize] was never called.
      */
     fun shutdown() {
-        try {
-            context.unregisterReceiver(receiver)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Receiver was not registered: ${e.message}")
+        if (isReceiverRegistered) {
+            try {
+                context.unregisterReceiver(receiver)
+                isReceiverRegistered = false
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Receiver was not registered: ${e.message}")
+            }
         }
+        isInitialized = false
         Log.d(TAG, "WifiDirectManager shut down.")
     }
 

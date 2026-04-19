@@ -17,7 +17,6 @@
     <string name="home_no_peers">अभी कोई पीयर जुड़ा नहीं है</string>
     <string name="home_sos_button">SOS</string>
     <string name="home_sos_subtitle">आपातकालीन अलर्ट भेजने के लिए टैप करें</string>
-    <string name="home_simulate_sos">आने वाला SOS सिम्युलेट करें</string>
     <string name="home_stat_peers_online">पीयर ऑनलाइन</string>
     <string name="home_stat_peers_sublabel">%1$d सत्यापित · स्कैन करने के लिए टैप करें</string>
     <string name="home_stat_nearby_camps">पास के शिविर</string>

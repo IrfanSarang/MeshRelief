@@ -10,6 +10,8 @@ import com.meshrelief.data.preferences.UserPreferences
 import com.meshrelief.data.repository.SOSRepository
 import com.meshrelief.mesh.protocol.MeshPacket
 import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.protocol.SosPayload
+import com.meshrelief.mesh.protocol.encode
 import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -22,28 +24,28 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class SOSUiState(
-    val selectedTriage: TriageLevel = TriageLevel.SAFE,
-    val showConfirmDialog: Boolean = false,
-    val confirmCountdown: Int = 10,
-    val cooldownRemainingMs: Long = 0L,
-    val sosSent: Boolean = false,
-    val userName: String = "",
-    val userPhone: String = ""
+    val selectedTriage    : TriageLevel = TriageLevel.SAFE,
+    val showConfirmDialog : Boolean     = false,
+    val confirmCountdown  : Int         = 10,
+    val cooldownRemainingMs : Long      = 0L,
+    val sosSent           : Boolean     = false,
+    val userName          : String      = "",
+    val userPhone         : String      = ""
 )
 
 @HiltViewModel
 class SOSViewModel @Inject constructor(
-    private val userPreferences: UserPreferences,
-    private val connectionManager: ConnectionManager,
-    private val sosRepository: SOSRepository,
-    private val locationProvider: LocationProvider
+    private val userPreferences : UserPreferences,
+    private val connectionManager : ConnectionManager,
+    private val sosRepository   : SOSRepository,
+    private val locationProvider : LocationProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SOSUiState())
     val uiState: StateFlow<SOSUiState> = _uiState
 
-    private var countdownJob: Job? = null
-    private var cooldownJob: Job? = null
+    private var countdownJob : Job? = null
+    private var cooldownJob  : Job? = null
 
     init {
         viewModelScope.launch {
@@ -66,7 +68,7 @@ class SOSViewModel @Inject constructor(
         if (_uiState.value.cooldownRemainingMs > 0) return
         _uiState.value = _uiState.value.copy(
             showConfirmDialog = true,
-            confirmCountdown = 10
+            confirmCountdown  = 10
         )
         startConfirmCountdown()
     }
@@ -75,43 +77,43 @@ class SOSViewModel @Inject constructor(
         countdownJob?.cancel()
         _uiState.value = _uiState.value.copy(
             showConfirmDialog = false,
-            sosSent = true
+            sosSent           = true
         )
         startCooldown()
 
         viewModelScope.launch {
-            // 1. Grab device ID (first emission is enough)
             val deviceId = userPreferences.userDeviceId.first()
 
-            // 2. Get last known location (null-safe)
             val location = locationProvider.getLastKnownLocation()
-            val lat = location?.latitude ?: 0.0
+            val lat = location?.latitude  ?: 0.0
             val lng = location?.longitude ?: 0.0
 
-            val state = _uiState.value
-            val packetId = UUID.randomUUID().toString()
-            val now = System.currentTimeMillis()
+            val state     = _uiState.value
+            val packetId  = UUID.randomUUID().toString()
+            val now       = System.currentTimeMillis()
 
-            // 3. Build payload JSON manually (no extra dependency needed)
-            val payload = """{"triage":"CRITICAL","lat":$lat,"lng":$lng,"message":""}"""
-
-            // 4. Build MeshPacket
-            val packet = MeshPacket(
-                id        = packetId,
-                type      = PacketType.SOS_ALERT,
-                senderId  = deviceId,
-                senderName  = state.userName,
-                senderPhone = state.userPhone,
-                payload   = payload,
-                ttl       = Constants.SOS_TTL,
-                timestamp = now,
-                signature = "" // ConnectionManager signs before send
+            // ── Build payload via SosPayload — uses selectedTriage, no hardcoding ──
+            val sosPayload = SosPayload(
+                triage  = state.selectedTriage.name,   // FIX: was hardcoded "CRITICAL"
+                lat     = lat,
+                lng     = lng,
+                message = ""
             )
 
-            // 5. Broadcast over Wi-Fi Direct
+            val packet = MeshPacket(
+                id          = packetId,
+                type        = PacketType.SOS_ALERT,
+                senderId    = deviceId,
+                senderName  = state.userName,
+                senderPhone = state.userPhone,
+                payload     = sosPayload.encode(),
+                ttl         = Constants.SOS_TTL,
+                timestamp   = now,
+                signature   = ""
+            )
+
             connectionManager.broadcastPacket(packet)
 
-            // 6. Persist to Room
             val entity = SOSEntity(
                 id           = packetId,
                 senderId     = deviceId,
@@ -131,7 +133,7 @@ class SOSViewModel @Inject constructor(
         countdownJob?.cancel()
         _uiState.value = _uiState.value.copy(
             showConfirmDialog = false,
-            confirmCountdown = 10
+            confirmCountdown  = 10
         )
     }
 
@@ -163,7 +165,7 @@ class SOSViewModel @Inject constructor(
             }
             _uiState.value = _uiState.value.copy(
                 cooldownRemainingMs = 0,
-                sosSent = false
+                sosSent             = false
             )
         }
     }

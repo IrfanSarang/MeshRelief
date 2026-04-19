@@ -21,6 +21,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.meshrelief.R
 import com.meshrelief.data.db.entity.PeerEntity
 import com.meshrelief.features.home.*
+import com.meshrelief.ui.theme.MeshAmber
+import com.meshrelief.ui.theme.MeshDark
+import com.meshrelief.ui.theme.MeshGray
+import com.meshrelief.ui.theme.MeshGreen
+import com.meshrelief.ui.theme.MeshGreenDark
+import com.meshrelief.ui.theme.MeshGreenLight
+import com.meshrelief.ui.theme.MeshMid
+import com.meshrelief.ui.theme.MeshRed
 
 @Composable
 fun StatusScreen(
