@@ -13,5 +13,11 @@ enum class PacketType {
     HEADCOUNT_RESPONSE,
     PEER_VERIFY,
     PEER_FLAG,
-    ACK
+    PEER_HANDSHAKE,
+    ACK,
+    ROUTE_REQUEST,
+    ROUTE_REPLY,
+    ROUTE_ERROR,
+    PING,
+    PONG
 }

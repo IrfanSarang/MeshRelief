@@ -21,8 +21,8 @@ import com.meshrelief.data.db.entity.SOSEntity
         CampEntity::class,
         BulletinEntity::class
     ],
-    version = 1,
-    exportSchema = false
+    version = 3,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 

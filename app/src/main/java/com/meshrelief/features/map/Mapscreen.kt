@@ -16,9 +16,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.WifiOff              // ← NEW
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,7 +48,6 @@ import org.osmdroid.views.overlay.Marker
 
 // ── Programmatic drawable icons (no assets needed) ───────────────────────────
 
-/** Filled circle — used for user dot and peer dots */
 private fun circleDotDrawable(context: Context, colorArgb: Int, radiusDp: Float = 14f): Drawable {
     val density = context.resources.displayMetrics.density
     val radiusPx = (radiusDp * density).toInt()
@@ -77,7 +77,6 @@ private fun circleDotDrawable(context: Context, colorArgb: Int, radiusDp: Float 
     }
 }
 
-/** Filled square pin (flat-bottom) — used for camp markers */
 private fun campPinDrawable(context: Context): Drawable {
     val density = context.resources.displayMetrics.density
     val squareSide = (18f * density).toInt()
@@ -149,15 +148,16 @@ fun MapScreen(
     onChatbotClick: () -> Unit,
     viewModel: MapViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState          by viewModel.uiState.collectAsState()
+    val mapTilesDownloaded by viewModel.mapTilesDownloaded.collectAsState()
+    val downloadProgress   by viewModel.downloadProgress.collectAsState()   // ← NEW
     val context = LocalContext.current
 
-    // ── NEW: observe tile download flag ───────────────────────────────────────
-    val mapTilesDownloaded by viewModel.mapTilesDownloaded.collectAsState()
+    // isDownloading = progress in [0, 99]; -1 = idle, 100 = done
+    val isDownloading = downloadProgress in 0..99
 
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
-    // ── CHANGED: replaced plain userAgentValue init with full OSMDroid config ─
     LaunchedEffect(Unit) {
         viewModel.configureOsmDroid(context)
     }
@@ -192,32 +192,24 @@ fun MapScreen(
                         controller.setCenter(
                             uiState.userLocation ?: GeoPoint(19.0760, 72.8777)
                         )
-                        // ── NEW: disable live network tile fetching ────────
-                        // OSMDroid will only read from the local tile cache.
-                        // Tiles downloaded during setup will still render;
-                        // uncached areas show as blank until tiles are fetched.
                         setUseDataConnection(false)
-
                         mapViewRef = this
                     }
                 },
                 update = { mapView ->
                     mapView.overlays.clear()
 
-                    // User location marker (blue dot)
                     uiState.userLocation?.let { pos ->
                         val marker = Marker(mapView).apply {
                             position = pos
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                             icon = circleDotDrawable(context, Color.parseColor("#2979FF"), 16f)
                             title = "You are here"
-                            snippet = null
                             setInfoWindow(null)
                         }
                         mapView.overlays.add(marker)
                     }
 
-                    // Peer markers
                     uiState.peers.forEach { peer ->
                         val marker = Marker(mapView).apply {
                             position = peer.position
@@ -229,7 +221,6 @@ fun MapScreen(
                         mapView.overlays.add(marker)
                     }
 
-                    // Camp markers
                     uiState.camps.forEach { camp ->
                         val marker = Marker(mapView).apply {
                             position = camp.position
@@ -322,30 +313,74 @@ fun MapScreen(
                         }
                     }
 
-                    // ── NEW: offline tiles warning banner ──────────────────
-                    // Shown only when MAP_TILES_DOWNLOADED == false.
-                    // Sits just below the title row, inside the same Surface.
+                    // ── Offline tiles warning / download banner ────────────
                     if (!mapTilesDownloaded) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MeshAmber.copy(alpha = 0.92f))
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.WifiOff,
-                                contentDescription = null,
-                                tint = androidx.compose.ui.graphics.Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Map tiles not downloaded. Connect to WiFi to download offline maps.",
-                                color = androidx.compose.ui.graphics.Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WifiOff,
+                                        contentDescription = null,
+                                        tint = androidx.compose.ui.graphics.Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = if (isDownloading)
+                                            "Downloading tiles… $downloadProgress%"
+                                        else
+                                            "Map tiles not downloaded. Tap to cache for offline use.",
+                                        color = androidx.compose.ui.graphics.Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                // ── Download button ────────────────────────
+                                if (!isDownloading) {
+                                    IconButton(
+                                        onClick = { viewModel.startTileDownload() },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(
+                                                androidx.compose.ui.graphics.Color.White.copy(alpha = 0.25f),
+                                                CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = "Download offline tiles",
+                                            tint = androidx.compose.ui.graphics.Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // ── Progress bar (visible while downloading) ───
+                            if (isDownloading) {
+                                LinearProgressIndicator(
+                                    progress = { downloadProgress / 100f },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp),
+                                    color = androidx.compose.ui.graphics.Color.White,
+                                    trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                     }
                 }
@@ -409,12 +444,12 @@ private fun LegendCard() {
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
-            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF2979FF), label = "Your location",        shape = "circle")
-            LegendRow(color = MeshGreen,                                       label = "Peer — Stable (Green)", shape = "circle")
-            LegendRow(color = MeshAmber,                                       label = "Peer — Caution (Amber)",shape = "circle")
-            LegendRow(color = MeshRed,                                         label = "Peer — Critical (Red)", shape = "circle")
-            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF5F5E5A), label = "Peer — Unknown",        shape = "circle")
-            LegendRow(color = MeshGreen,                                       label = "Relief camp",           shape = "square")
+            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF2979FF), label = "Your location",         shape = "circle")
+            LegendRow(color = MeshGreen,                                       label = "Peer — Stable (Green)",  shape = "circle")
+            LegendRow(color = MeshAmber,                                       label = "Peer — Caution (Amber)", shape = "circle")
+            LegendRow(color = MeshRed,                                         label = "Peer — Critical (Red)",  shape = "circle")
+            LegendRow(color = androidx.compose.ui.graphics.Color(0xFF5F5E5A), label = "Peer — Unknown",         shape = "circle")
+            LegendRow(color = MeshGreen,                                       label = "Relief camp",            shape = "square")
         }
     }
 }

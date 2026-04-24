@@ -195,6 +195,7 @@ fun SOSScreen(
             }
 
             // SOS sent confirmation
+            // SOS sent confirmation
             if (uiState.sosSent) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(
@@ -218,6 +219,27 @@ fun SOSScreen(
                         color = Color(0xFF0F6E56)
                     )
                 }
+
+                // ── MISSING 5 FIX ─────────────────────────────────────
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MeshAmber)
+                        .clickable { viewModel.cancelSOS() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Cancel SOS",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+                // ─────────────────────────────────────────────────────
             }
         }
 

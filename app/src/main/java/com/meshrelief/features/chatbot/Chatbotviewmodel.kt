@@ -33,8 +33,141 @@ data class ChatbotUiState(
     val messages: List<ChatbotMessage> = emptyList(),
     val inputText: String = "",
     val isTyping: Boolean = false,
-    val selectedCategory: ChatbotCategory? = null
+    val selectedCategory: ChatbotCategory? = null,
+    val engineMode: String = "keyword"   // "keyword" or "llm" — shown in debug/UI if needed
 )
+
+// ── LLM Engine abstraction ────────────────────────────────────────────────────
+
+/**
+ * Common interface for all response engines.
+ * Implement this to swap in any on-device LLM without touching the ViewModel.
+ */
+interface LlmEngine {
+    /** Returns true if the engine initialised successfully and is ready to use. */
+    val isAvailable: Boolean
+
+    /** Generate a response for the given [prompt]. Must be safe to call from any coroutine. */
+    suspend fun generate(prompt: String): String
+}
+
+// ── Engine: keyword-only (current logic, always available) ───────────────────
+
+class OfflineKeywordEngine : LlmEngine {
+
+    override val isAvailable: Boolean = true
+
+    override suspend fun generate(prompt: String): String {
+        val lowerQuery = prompt.lowercase()
+        val match = KNOWLEDGE_BASE.firstOrNull { entry ->
+            entry.keywords.any { keyword -> lowerQuery.contains(keyword) }
+        }
+        return if (match != null) {
+            match.answer
+        } else {
+            val fallback = FALLBACK_RESPONSES[fallbackIndex % FALLBACK_RESPONSES.size]
+            fallbackIndex++
+            fallback
+        }
+    }
+
+    companion object {
+        private var fallbackIndex = 0
+    }
+}
+
+// ── Engine: MediaPipe LLM Inference (optional, requires model file on device) ─
+
+/**
+ * Wraps the MediaPipe LLM Inference API.
+ *
+ * To activate:
+ *  1. Add the dependency in app/build.gradle.kts:
+ *       implementation("com.google.mediapipe:tasks-genai:0.10.14")
+ *  2. Push a compatible .bin model to the device (e.g. Gemma-2B) and set MODEL_PATH.
+ *  3. Change the injection binding in your Hilt module to provide MediaPipeLlmEngine
+ *     instead of OfflineKeywordEngine, wrapped in LlmEngineWithFallback.
+ *
+ * The engine is kept behind a try/catch so that missing model files or API
+ * unavailability never crash the app — it simply marks itself unavailable and
+ * the ViewModel falls back to keyword matching automatically.
+ */
+class MediaPipeLlmEngine(
+    private val context: android.content.Context
+) : LlmEngine {
+
+    // Path to the model file on device storage, e.g.:
+    //   "/data/local/tmp/gemma-2b-it-cpu-int4.bin"
+    // or an asset path resolved at runtime.
+    private val MODEL_PATH = "" // ← set before enabling
+
+    private var inferenceSession: Any? = null   // typed as Any to avoid hard compile dependency
+
+    override val isAvailable: Boolean
+        get() = inferenceSession != null
+
+    init {
+        if (MODEL_PATH.isNotBlank()) {
+            try {
+                // Reflectively initialise so the class compiles even when the
+                // mediapipe dependency is absent (e.g. in CI / other flavours).
+                val optionsClass = Class.forName(
+                    "com.google.mediapipe.tasks.genai.llminference.LlmInference\$LlmInferenceOptions"
+                )
+                val builderClass = Class.forName(
+                    "com.google.mediapipe.tasks.genai.llminference.LlmInference\$LlmInferenceOptions\$Builder"
+                )
+                val builder = builderClass.getDeclaredConstructor().newInstance()
+                builderClass.getMethod("setModelPath", String::class.java)
+                    .invoke(builder, MODEL_PATH)
+                val options = builderClass.getMethod("build").invoke(builder)
+
+                val llmClass = Class.forName(
+                    "com.google.mediapipe.tasks.genai.llminference.LlmInference"
+                )
+                inferenceSession = llmClass
+                    .getMethod("createFromOptions", android.content.Context::class.java, optionsClass)
+                    .invoke(null, context, options)
+            } catch (e: Exception) {
+                inferenceSession = null   // model absent or API unavailable — fall back silently
+            }
+        }
+    }
+
+    override suspend fun generate(prompt: String): String {
+        val session = inferenceSession ?: return ""
+        return try {
+            val method = session.javaClass.getMethod("generateResponse", String::class.java)
+            method.invoke(session, prompt) as? String ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+}
+
+// ── Engine: composite with automatic keyword fallback ────────────────────────
+
+/**
+ * Tries [primary] first; if it is unavailable or returns a blank response,
+ * delegates to [fallback] (the keyword engine).
+ */
+class LlmEngineWithFallback(
+    private val primary: LlmEngine,
+    private val fallback: LlmEngine = OfflineKeywordEngine()
+) : LlmEngine {
+
+    override val isAvailable: Boolean = true   // composite is always available
+
+    val usingLlm: Boolean get() = primary.isAvailable
+
+    override suspend fun generate(prompt: String): String {
+        if (primary.isAvailable) {
+            val result = primary.generate(prompt)
+            if (result.isNotBlank()) return result
+        }
+        return fallback.generate(prompt)
+    }
+}
 
 // ── Offline knowledge base ────────────────────────────────────────────────────
 
@@ -364,7 +497,7 @@ private val KNOWLEDGE_BASE: List<KnowledgeEntry> = listOf(
     )
 )
 
-// ── Fallback ──────────────────────────────────────────────────────────────────
+// ── Fallback responses ────────────────────────────────────────────────────────
 
 private val FALLBACK_RESPONSES = listOf(
     "I don't have a specific answer for that, but I can help with: Water purification, Food safety, First Aid, Shelter building, Evacuation planning, and SOS signals. Try asking about one of those topics.",
@@ -372,14 +505,33 @@ private val FALLBACK_RESPONSES = listOf(
     "I didn't find a match for your question. You can tap a category below to browse survival tips by topic."
 )
 
-private var fallbackIndex = 0
-
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
-class ChatbotViewModel @Inject constructor() : ViewModel() {
+class ChatbotViewModel @Inject constructor(
+    /**
+     * Inject an [LlmEngine] implementation.
+     *
+     * Default binding (no model file): provide [OfflineKeywordEngine] via Hilt.
+     * With MediaPipe model: provide [LlmEngineWithFallback](MediaPipeLlmEngine, OfflineKeywordEngine).
+     *
+     * Example Hilt module (add to your di/ package):
+     *
+     *   @Module @InstallIn(SingletonComponent::class)
+     *   object ChatbotModule {
+     *       @Provides @Singleton
+     *       fun provideLlmEngine(): LlmEngine = OfflineKeywordEngine()
+     *       // To enable MediaPipe:
+     *       // fun provideLlmEngine(@ApplicationContext ctx: Context): LlmEngine =
+     *       //     LlmEngineWithFallback(MediaPipeLlmEngine(ctx))
+     *   }
+     */
+    private val llmEngine: LlmEngine
+) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ChatbotUiState())
+    private val _uiState = MutableStateFlow(
+        ChatbotUiState(engineMode = if (llmEngine is LlmEngineWithFallback && llmEngine.usingLlm) "llm" else "keyword")
+    )
     val uiState: StateFlow<ChatbotUiState> = _uiState.asStateFlow()
 
     init {
@@ -412,8 +564,15 @@ class ChatbotViewModel @Inject constructor() : ViewModel() {
         )
 
         viewModelScope.launch {
-            delay(700) // Simulate response latency
-            val botMsg = generateResponse(query)
+            delay(700)
+            val responseText = llmEngine.generate(query)
+            val category = inferCategory(responseText)
+            val botMsg = ChatbotMessage(
+                id = "bot_${System.currentTimeMillis()}",
+                text = responseText,
+                isUser = false,
+                category = category
+            )
             _uiState.value = _uiState.value.copy(
                 messages = _uiState.value.messages + botMsg,
                 isTyping = false
@@ -452,27 +611,17 @@ class ChatbotViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    private fun generateResponse(query: String): ChatbotMessage {
-        val lowerQuery = query.lowercase()
-        val match = KNOWLEDGE_BASE.firstOrNull { entry ->
-            entry.keywords.any { keyword -> lowerQuery.contains(keyword) }
-        }
-
-        return if (match != null) {
-            ChatbotMessage(
-                id = "bot_${System.currentTimeMillis()}",
-                text = match.answer,
-                isUser = false,
-                category = match.category
-            )
-        } else {
-            val fallback = FALLBACK_RESPONSES[fallbackIndex % FALLBACK_RESPONSES.size]
-            fallbackIndex++
-            ChatbotMessage(
-                id = "bot_${System.currentTimeMillis()}",
-                text = fallback,
-                isUser = false
-            )
+    /** Heuristically maps an answer string back to a category (used for LLM responses). */
+    private fun inferCategory(text: String): ChatbotCategory? {
+        val t = text.lowercase()
+        return when {
+            t.contains("💧") || t.contains("water") -> ChatbotCategory.WATER
+            t.contains("🥫") || t.contains("food") || t.contains("eat") -> ChatbotCategory.FOOD
+            t.contains("🩹") || t.contains("first aid") || t.contains("bleeding") -> ChatbotCategory.FIRST_AID
+            t.contains("🏕") || t.contains("shelter") -> ChatbotCategory.SHELTER
+            t.contains("🚨") || t.contains("evacuat") -> ChatbotCategory.EVACUATION
+            t.contains("📡") || t.contains("sos") || t.contains("signal") -> ChatbotCategory.SOS_SIGNAL
+            else -> null
         }
     }
 }

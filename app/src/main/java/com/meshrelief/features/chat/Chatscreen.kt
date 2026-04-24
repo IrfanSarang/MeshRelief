@@ -363,6 +363,17 @@ private fun P2PChatConversationScreen(
     val input by viewModel.p2pInput.collectAsState()
     val listState = rememberLazyListState()
 
+    // ✅ NEW: snackbar + error state
+    val snackbarHostState = remember { SnackbarHostState() }
+    val p2pSendError by viewModel.p2pSendError.collectAsState()
+
+    LaunchedEffect(p2pSendError) {
+        p2pSendError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearP2pSendError() // IMPORTANT: prevent repeat snackbars (if you have this)
+        }
+    }
+
     val triageColor = when (peer.triageColor) {
         "green" -> MeshGreen
         "yellow" -> MeshAmber
@@ -374,82 +385,115 @@ private fun P2PChatConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        Row(
+    // ✅ WRAP with Scaffold
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(innerPadding) // IMPORTANT
                 .background(Color.White)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+
+            // ---------------- HEADER ----------------
+            Row(
                 modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(MeshGray)
-                    .clickable { onBack() },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = null,
-                    tint = MeshMid,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Box(
-                modifier = Modifier.size(32.dp).clip(CircleShape).background(MeshGreenLight),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = peer.name.take(2).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MeshGreenDark)
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${peer.name} (••••${peer.idSuffix})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MeshDark
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MeshGray)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = null,
+                        tint = MeshMid,
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(triageColor))
                 }
-                Text(
-                    text = if (peer.hopCount == 1)
-                        stringResource(R.string.chat_private_channel, peer.hopCount)
-                    else
-                        stringResource(R.string.chat_private_channel_plural, peer.hopCount),
-                    fontSize = 9.sp,
-                    color = MeshGreen
-                )
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Box(
+                    modifier = Modifier.size(32.dp)
+                        .clip(CircleShape)
+                        .background(MeshGreenLight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = peer.name.take(2).uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MeshGreenDark
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${peer.name} (••••${peer.idSuffix})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MeshDark
+                        )
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(triageColor)
+                        )
+                    }
+
+                    Text(
+                        text = if (peer.hopCount == 1)
+                            stringResource(R.string.chat_private_channel, peer.hopCount)
+                        else
+                            stringResource(R.string.chat_private_channel_plural, peer.hopCount),
+                        fontSize = 9.sp,
+                        color = MeshGreen
+                    )
+                }
             }
-        }
 
-        HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
+            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth().background(MeshGray),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            items(messages, key = { it.id }) { message ->
-                MessageBubble(message = message)
+            // ---------------- MESSAGES ----------------
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(MeshGray),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(messages, key = { it.id }) { message ->
+                    MessageBubble(message = message)
+                }
             }
-        }
 
-        ChatInputBar(
-            value = input,
-            onValueChange = viewModel::onP2pInputChange,
-            onSend = viewModel::sendP2pMessage,
-            placeholder = "Message ${peer.name}…"
-        )
+            // ---------------- INPUT ----------------
+            ChatInputBar(
+                value = input,
+                onValueChange = viewModel::onP2pInputChange,
+                onSend = viewModel::sendP2pMessage,
+                placeholder = "Message ${peer.name}…"
+            )
+        }
     }
 }
 

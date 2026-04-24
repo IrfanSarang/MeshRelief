@@ -36,6 +36,10 @@ import com.meshrelief.ui.theme.MeshMid
 import com.meshrelief.ui.theme.MeshRed
 import kotlin.math.cos
 import kotlin.math.sin
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import androidx.compose.ui.platform.LocalContext
 
 // ---------------------------------------------------------------------------
 // Screen entry point
@@ -47,6 +51,14 @@ fun DiscoveryScreen(
     viewModel: DiscoveryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val context = LocalContext.current
+    val batteryPercent = remember {
+        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, 50) ?: 50
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+        (level * 100 / scale)
+    }
 
     Scaffold(
         containerColor = MeshGray,
@@ -104,7 +116,7 @@ fun DiscoveryScreen(
                 items(uiState.peers, key = { it.id }) { peer ->
                     PeerCard(
                         peer = peer,
-                        onConnect = { viewModel.connectToPeer(peer.id) }
+                        onConnect = { viewModel.connectToPeer(peer.id, batteryPercent) }
                     )
                 }
             }

@@ -13,5 +13,5 @@ object AppEventBusModule {
 
     @Provides
     @Singleton
-    fun provideAppEventBus(): AppEventBus = AppEventBus
+    fun provideAppEventBus(): AppEventBus = AppEventBus()
 }

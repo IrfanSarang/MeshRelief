@@ -10,6 +10,8 @@ import com.meshrelief.core.crypto.DeviceIdentity
 import com.meshrelief.data.preferences.UserPreferences
 import com.meshrelief.mesh.protocol.MeshPacket
 import com.meshrelief.mesh.protocol.PacketType
+import com.meshrelief.mesh.protocol.StatusPayload
+import com.meshrelief.mesh.protocol.encode
 import com.meshrelief.mesh.wifi.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.util.UUID
 import javax.inject.Inject
 
@@ -101,12 +102,14 @@ class MyStatusViewModel @Inject constructor(
             // 3. Read current battery level via BatteryManager
             val battery = getBatteryPercent()
 
-            // 4. Build JSON payload  { triage, message, battery }
-            val payload = JSONObject().apply {
-                put("triage", triage)
-                put("message", message)
-                put("battery", battery)
-            }.toString()
+            // 4. Build payload using StatusPayload so the receiver's
+            //    MeshJson.decodeFromString(StatusPayload.serializer(), payload)
+            //    gets the required @SerialName("status") type discriminator.
+            val payload = StatusPayload(
+                triage  = triage,
+                battery = battery,
+                message = message
+            ).encode()
 
             // 5. Build MeshPacket
             //    signature is filled in by ConnectionManager.sendPacket() (Issue #15),
@@ -124,15 +127,17 @@ class MyStatusViewModel @Inject constructor(
             )
 
             // 6. Broadcast to all visible peers
-            val results = connectionManager.broadcastPacket(packet)
+            val success = try {
+                connectionManager.broadcastPacket(packet)
+                true
+            } catch (e: Exception) {
+                false
+            }
 
-            // Consider it a success if at least one peer received the packet
-            // (or if there were no peers — offline/solo use is still valid)
-            val anyFailure = results.values.any { !it }
             _uiState.value = _uiState.value.copy(
                 isBroadcasting = false,
-                broadcastSuccess = !anyFailure || results.isEmpty(),
-                broadcastError = if (anyFailure) "Some peers could not be reached" else null
+                broadcastSuccess = success,
+                broadcastError = if (!success) "Some peers could not be reached" else null
             )
         }
     }

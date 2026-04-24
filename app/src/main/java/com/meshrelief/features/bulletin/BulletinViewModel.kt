@@ -48,9 +48,10 @@ data class BulletinUiState(
 
 @HiltViewModel
 class BulletinViewModel @Inject constructor(
-    private val repository      : BulletinRepository,
+    private val repository        : BulletinRepository,
     private val connectionManager : ConnectionManager,
-    private val userPreferences : UserPreferences
+    private val userPreferences   : UserPreferences,
+    private val appEventBus       : AppEventBus       // BUG 1 FIX: injected, not static
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BulletinUiState())
@@ -65,8 +66,9 @@ class BulletinViewModel @Inject constructor(
         }
 
         // 2. Collect incoming bulletin packets from the mesh
+        // BUG 1 FIX: use injected appEventBus, not static AppEventBus object
         viewModelScope.launch {
-            AppEventBus.bulletin.collect { packet ->
+            appEventBus.bulletin.collect { packet ->
                 val entity = packet.toBulletinEntity(isRelayed = true)
                 repository.save(entity)
             }
@@ -119,7 +121,6 @@ class BulletinViewModel @Inject constructor(
             val packetId  = UUID.randomUUID().toString()
             val timestamp = System.currentTimeMillis()
 
-            // ── Build payload via BulletinPayload — replaces fragile "CATEGORY|text" ──
             val bulletinPayload = BulletinPayload(
                 category = state.composeCategory.name,
                 text     = trimmed
@@ -181,16 +182,11 @@ private fun BulletinEntity.toBulletinItem(): BulletinItem =
         isRelayed       = relayCount > 0
     )
 
-/**
- * Decode incoming packet via BulletinPayload schema.
- * Falls back gracefully if payload is legacy pipe-format or malformed.
- */
 private fun MeshPacket.toBulletinEntity(isRelayed: Boolean): BulletinEntity {
     val (category, text) = runCatching {
         val p = decodeBulletin()
         p.category to p.text
     }.getOrElse {
-        // Legacy fallback: "CATEGORY|message" — remove once all clients updated
         val parts = payload.split("|", limit = 2)
         val cat   = if (parts.size == 2)
             runCatching { BulletinCategory.valueOf(parts[0]) }.getOrNull()?.name

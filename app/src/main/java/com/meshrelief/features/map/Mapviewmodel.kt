@@ -57,13 +57,19 @@ class MapViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
     private val peerRepository: PeerRepository,
     private val campRepository: CampRepository,
-    private val userPreferences: UserPreferences          // ← NEW
+    private val userPreferences: UserPreferences,
+    private val tileDownloadManager: TileDownloadManager   // ← NEW
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
-    // ── NEW: expose MAP_TILES_DOWNLOADED as a StateFlow ───────────────────────
+    // ── Tile download state ───────────────────────────────────────────────────
+
+    /** -1 = idle / not downloading; 0–100 = in progress or complete */
+    private val _downloadProgress = MutableStateFlow(-1)
+    val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
+
     val mapTilesDownloaded: StateFlow<Boolean> = userPreferences.mapTilesDownloaded
         .stateIn(
             scope = viewModelScope,
@@ -71,10 +77,11 @@ class MapViewModel @Inject constructor(
             initialValue = false
         )
 
+    // ─────────────────────────────────────────────────────────────────────────
+
     init {
         _uiState.value = MapUiState(isLocating = true)
 
-        // Combine both Room flows; any emission from either triggers a UI update
         viewModelScope.launch {
             combine(
                 peerRepository.getAllPeers(),
@@ -92,23 +99,39 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch { refreshLocation() }
     }
 
-    // ── NEW: configure OSMDroid to use local cache ────────────────────────────
+    // ── Tile download ─────────────────────────────────────────────────────────
+
     /**
-     * Must be called once from the Composable (inside LaunchedEffect) before
-     * the MapView is created.  Sets the tile cache path and size so OSMDroid
-     * reads/writes tiles locally instead of always hitting the network.
+     * Starts a background tile pre-fetch centred on the current user location
+     * (falls back to a default if location is unavailable).
+     * No-ops if a download is already in progress.
      */
+    fun startTileDownload() {
+        if (_downloadProgress.value in 0..99) return          // already running
+
+        val centre = _uiState.value.userLocation
+            ?: GeoPoint(19.0760, 72.8777)                     // Mumbai fallback
+
+        viewModelScope.launch {
+            tileDownloadManager.downloadTiles(centre).collect { progress ->
+                _downloadProgress.value = progress
+            }
+        }
+    }
+
+    // ── OSMDroid configuration ────────────────────────────────────────────────
+
     fun configureOsmDroid(context: Context) {
         Configuration.getInstance().apply {
             userAgentValue = context.packageName
             tileFileSystemCacheMaxBytes =
-                Constants.MAP_TILE_CACHE_MB * 1024L * 1024L          // 200 MB
+                Constants.MAP_TILE_CACHE_MB * 1024L * 1024L
             osmdroidBasePath  = File(context.filesDir, "osmdroid")
             osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Location helpers ──────────────────────────────────────────────────────
 
     suspend fun refreshLocation() {
         _uiState.value = _uiState.value.copy(isLocating = true)

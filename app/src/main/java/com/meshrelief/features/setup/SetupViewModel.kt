@@ -19,6 +19,7 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.MapTileIndex
 import java.io.File
+import kotlinx.coroutines.flow.first
 
 data class SetupUiState(
     val name: String = "",
@@ -102,11 +103,16 @@ class SetupViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            val deviceId = deviceIdentity.generateDeviceId(state.phone)
+            // Only generate ONCE — if ID already exists, reuse it
+            val existingId = userPreferences.userDeviceId.first()
+            if (existingId.isEmpty()) {
+                val deviceId = deviceIdentity.generateDeviceId(state.phone)
+                userPreferences.saveDeviceId(deviceId)
+            }
 
             userPreferences.saveUserName(state.name.trim())
             userPreferences.saveUserPhone(state.phone.trim())
-            userPreferences.saveDeviceId(deviceId)
+            // removed: userPreferences.saveDeviceId(deviceId) — now inside the guard above
             userPreferences.saveLanguage(state.language)
             userPreferences.setSetupComplete(true)
 

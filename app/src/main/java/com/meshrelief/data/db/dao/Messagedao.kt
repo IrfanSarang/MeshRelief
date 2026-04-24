@@ -31,4 +31,8 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
+
+    // MISSING 3: flip isDelivered when an ACK packet arrives for this message
+    @Query("UPDATE messages SET isDelivered = 1 WHERE id = :messageId")
+    suspend fun markDelivered(messageId: String)
 }

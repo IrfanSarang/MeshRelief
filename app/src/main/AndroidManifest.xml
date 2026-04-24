@@ -41,6 +41,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".MeshApplication"
         android:allowBackup="true"
@@ -72,18 +74,14 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-        <!--
-        ══════════════════════════════════════════════════════════════════
-        NOTE — WifiP2pBroadcastReceiver (Issue #9)
-        ══════════════════════════════════════════════════════════════════
-        The receiver is registered/unregistered PROGRAMMATICALLY in
-        WifiDirectManager.initialize() / shutdown(), which are called
-        from MainActivity.onResume / onPause (see Issue #9 wiring note).
-
-        Do NOT register it statically here — WifiP2pManager intents are
-        not delivered to static receivers on API 26+ (background limits).
-        ══════════════════════════════════════════════════════════════════
-        -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

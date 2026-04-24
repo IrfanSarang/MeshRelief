@@ -13,5 +13,6 @@ data class MessageEntity(
     val type: String,
     val timestamp: Long,
     val hopCount: Int = 0,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val isDelivered: Boolean = false   // MISSING 3: flipped to true when ACK arrives
 )

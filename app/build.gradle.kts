@@ -53,6 +53,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // ← added: tells KSP where to write Room schema JSON files
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
@@ -97,4 +102,8 @@ dependencies {
     // Core
     implementation(libs.core.ktx)
     implementation(libs.splash.screen)
+
+    // MediaPipe LLM Inference — on-device LLM support (optional; activate by setting
+    // MODEL_PATH in MediaPipeLlmEngine and providing it via the Hilt ChatbotModule)
+    implementation("com.google.mediapipe:tasks-genai:0.10.14")
 }

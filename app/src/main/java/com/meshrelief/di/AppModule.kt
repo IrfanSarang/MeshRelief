@@ -23,4 +23,7 @@ object AppModule {
     fun provideDataStore(
         @ApplicationContext context: Context
     ): DataStore<Preferences> = context.dataStore
+
+    // NOTE: AppEventBus does NOT need a @Provides entry here.
+    // Hilt auto-binds it because it is annotated with @Singleton + @Inject constructor().
 }

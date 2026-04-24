@@ -15,5 +15,7 @@ data class PeerEntity(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val lastSeen: Long = 0L,
-    val hopCount: Int = 0
+    val hopCount: Int = 0,
+    val linkQuality: Int = 0,
+    val publicKeyBytes: ByteArray = byteArrayOf()
 )

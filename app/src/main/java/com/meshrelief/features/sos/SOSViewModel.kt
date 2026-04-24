@@ -24,28 +24,29 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class SOSUiState(
-    val selectedTriage    : TriageLevel = TriageLevel.SAFE,
-    val showConfirmDialog : Boolean     = false,
-    val confirmCountdown  : Int         = 10,
-    val cooldownRemainingMs : Long      = 0L,
-    val sosSent           : Boolean     = false,
-    val userName          : String      = "",
-    val userPhone         : String      = ""
+    val selectedTriage      : TriageLevel = TriageLevel.SAFE,
+    val showConfirmDialog   : Boolean     = false,
+    val confirmCountdown    : Int         = 10,
+    val cooldownRemainingMs : Long        = 0L,
+    val sosSent             : Boolean     = false,
+    val userName            : String      = "",
+    val userPhone           : String      = ""
 )
 
 @HiltViewModel
 class SOSViewModel @Inject constructor(
-    private val userPreferences : UserPreferences,
+    private val userPreferences   : UserPreferences,
     private val connectionManager : ConnectionManager,
-    private val sosRepository   : SOSRepository,
-    private val locationProvider : LocationProvider
+    private val sosRepository     : SOSRepository,
+    private val locationProvider  : LocationProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SOSUiState())
     val uiState: StateFlow<SOSUiState> = _uiState
 
-    private var countdownJob : Job? = null
-    private var cooldownJob  : Job? = null
+    private var countdownJob      : Job?   = null
+    private var cooldownJob       : Job?   = null
+    private var activeSosPacketId : String? = null
 
     init {
         viewModelScope.launch {
@@ -60,9 +61,13 @@ class SOSViewModel @Inject constructor(
         }
     }
 
+    // ── Triage ─────────────────────────────────────────────────────────────
+
     fun onTriageSelected(triage: TriageLevel) {
         _uiState.value = _uiState.value.copy(selectedTriage = triage)
     }
+
+    // ── SOS button flow ────────────────────────────────────────────────────
 
     fun onSOSButtonPressed() {
         if (_uiState.value.cooldownRemainingMs > 0) return
@@ -83,33 +88,35 @@ class SOSViewModel @Inject constructor(
 
         viewModelScope.launch {
             val deviceId = userPreferences.userDeviceId.first()
-
             val location = locationProvider.getLastKnownLocation()
-            val lat = location?.latitude  ?: 0.0
-            val lng = location?.longitude ?: 0.0
+            val lat      = location?.latitude  ?: 0.0
+            val lng      = location?.longitude ?: 0.0
+            val state    = _uiState.value
+            val packetId = UUID.randomUUID().toString()
+            val now      = System.currentTimeMillis()
 
-            val state     = _uiState.value
-            val packetId  = UUID.randomUUID().toString()
-            val now       = System.currentTimeMillis()
+            activeSosPacketId = packetId
 
-            // ── Build payload via SosPayload — uses selectedTriage, no hardcoding ──
+            val sprayCount = sprayCountFor(state.selectedTriage)
+
             val sosPayload = SosPayload(
-                triage  = state.selectedTriage.name,   // FIX: was hardcoded "CRITICAL"
+                triage  = state.selectedTriage.name,
                 lat     = lat,
                 lng     = lng,
                 message = ""
             )
 
             val packet = MeshPacket(
-                id          = packetId,
-                type        = PacketType.SOS_ALERT,
-                senderId    = deviceId,
-                senderName  = state.userName,
-                senderPhone = state.userPhone,
-                payload     = sosPayload.encode(),
-                ttl         = Constants.SOS_TTL,
-                timestamp   = now,
-                signature   = ""
+                id             = packetId,
+                type           = PacketType.SOS_ALERT,
+                senderId       = deviceId,
+                senderName     = state.userName,
+                senderPhone    = state.userPhone,
+                payload        = sosPayload.encode(),
+                ttl            = Constants.SOS_TTL,
+                timestamp      = now,
+                signature      = "",
+                sprayCount     = sprayCount
             )
 
             connectionManager.broadcastPacket(packet)
@@ -137,6 +144,48 @@ class SOSViewModel @Inject constructor(
         )
     }
 
+    fun cancelSOS() {
+        val originalId = activeSosPacketId ?: return
+        viewModelScope.launch {
+            val deviceId = userPreferences.userDeviceId.first()
+            val state    = _uiState.value
+
+            val packet = MeshPacket(
+                id          = UUID.randomUUID().toString(),
+                type        = PacketType.SOS_CANCEL,
+                senderId    = deviceId,
+                senderName  = state.userName,
+                senderPhone = state.userPhone,
+                payload     = originalId,
+                ttl         = Constants.SOS_TTL,
+                timestamp   = System.currentTimeMillis(),
+                signature   = ""
+            )
+            connectionManager.broadcastPacket(packet)
+            sosRepository.markResolved(originalId)
+        }
+
+        activeSosPacketId = null
+        cooldownJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            sosSent             = false,
+            cooldownRemainingMs = 0L
+        )
+    }
+
+    // ── Internal helpers ───────────────────────────────────────────────────
+
+    /**
+     * Binary-halving spray budget per triage level.
+     * CRITICAL floods aggressively; SAFE is near-direct only.
+     */
+    private fun sprayCountFor(triage: TriageLevel): Int = when (triage) {
+        TriageLevel.CRITICAL -> 16
+        TriageLevel.MINOR    -> 8
+        TriageLevel.SAFE     -> 4
+        TriageLevel.UNKNOWN  -> 2
+    }
+
     private fun startConfirmCountdown() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
@@ -151,7 +200,9 @@ class SOSViewModel @Inject constructor(
     private fun startCooldown() {
         val cooldownMs = when (_uiState.value.selectedTriage) {
             TriageLevel.CRITICAL -> Constants.SOS_COOLDOWN_CRITICAL_MS
-            else                 -> Constants.SOS_COOLDOWN_DEFAULT_MS
+            TriageLevel.MINOR,
+            TriageLevel.SAFE,
+            TriageLevel.UNKNOWN  -> Constants.SOS_COOLDOWN_DEFAULT_MS
         }
         _uiState.value = _uiState.value.copy(cooldownRemainingMs = cooldownMs)
 

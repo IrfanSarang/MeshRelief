@@ -56,8 +56,9 @@ data class CampDetailUiState(
 
 @HiltViewModel
 class CampDetailViewModel @Inject constructor(
-    private val campRepository  : CampRepository,
-    private val connectionManager : ConnectionManager
+    private val campRepository    : CampRepository,
+    private val connectionManager : ConnectionManager,
+    private val appEventBus       : AppEventBus       // BUG 1 FIX: injected, not static
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CampDetailUiState())
@@ -74,23 +75,22 @@ class CampDetailViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        // 2. Collect mesh campUpdate events → decode via CampPayload → upsert to Room
+        // 2. BUG 1 FIX: use injected appEventBus, not static AppEventBus object
         viewModelScope.launch {
-            AppEventBus.campUpdate.collect { packet ->
+            appEventBus.campUpdate.collect { packet ->
                 runCatching {
-                    // ── Decode via schema — no longer assumes payload == CampEntity JSON ──
                     val p = packet.decodeCamp()
                     val entity = CampEntity(
-                        id        = p.campId,
-                        name      = p.name,
-                        type      = p.type,
-                        capacity  = p.capacity,
+                        id           = p.campId,
+                        name         = p.name,
+                        type         = p.type,
+                        capacity     = p.capacity,
                         currentCount = p.occupancy,
-                        lat       = p.lat,
-                        lng       = p.lng,
-                        adminId   = "",          // not in payload; filled by auth layer
-                        notes     = p.adminNotes,
-                        updatedAt = System.currentTimeMillis()
+                        lat          = p.lat,
+                        lng          = p.lng,
+                        adminId      = "",
+                        notes        = p.adminNotes,
+                        updatedAt    = System.currentTimeMillis()
                     )
                     campRepository.upsert(entity)
                 }
@@ -121,8 +121,8 @@ class CampDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(filter = filter, filtered = filtered)
     }
 
-    fun openBroadcastSheet()  = _uiState.value.let {
-        _uiState.value = it.copy(showBroadcastSheet = true)
+    fun openBroadcastSheet() {
+        _uiState.value = _uiState.value.copy(showBroadcastSheet = true)
     }
 
     fun closeBroadcastSheet() {
@@ -138,7 +138,6 @@ class CampDetailViewModel @Inject constructor(
         if (message.isBlank()) return
 
         viewModelScope.launch {
-            // ── Bulletin payload uses BulletinPayload schema ──
             val bulletinPayload = BulletinPayload(
                 category = "GENERAL",
                 text     = message
@@ -170,12 +169,6 @@ class CampDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showSnackbar = false, snackbarMessage = "")
     }
 
-    // ── Broadcast own camp status over mesh ───────────────────────────────────
-
-    /**
-     * Call this whenever local camp data changes and should be propagated to peers.
-     * Encodes via CampPayload — the standard schema for CAMP_UPDATE packets.
-     */
     fun broadcastCampUpdate(camp: CampDetail) {
         viewModelScope.launch {
             val campPayload = CampPayload(

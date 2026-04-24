@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -26,6 +27,7 @@ class UserPreferences @Inject constructor(
         val SETUP_COMPLETE = booleanPreferencesKey("setup_complete")
         val MY_TRIAGE_STATUS = stringPreferencesKey("my_triage_status")
         val MY_STATUS_MESSAGE = stringPreferencesKey("my_status_message")
+        val MY_BATTERY_LEVEL = intPreferencesKey("my_battery_level")
         val BATTERY_SAVER_MODE = booleanPreferencesKey("battery_saver_mode")
         val MAP_TILES_DOWNLOADED = booleanPreferencesKey("map_tiles_downloaded")
     }
@@ -62,6 +64,10 @@ class UserPreferences @Inject constructor(
 
     val myStatusMessage: Flow<String> = dataStore.data.map {
         it[MY_STATUS_MESSAGE] ?: ""
+    }
+
+    val myBatteryLevel: Flow<Int> = dataStore.data.map {
+        it[MY_BATTERY_LEVEL] ?: 100
     }
 
     val batterySaverMode: Flow<Boolean> = dataStore.data.map {
@@ -104,6 +110,10 @@ class UserPreferences @Inject constructor(
 
     suspend fun saveStatusMessage(message: String) {
         dataStore.edit { it[MY_STATUS_MESSAGE] = message }
+    }
+
+    suspend fun saveMyBatteryLevel(level: Int) {
+        dataStore.edit { it[MY_BATTERY_LEVEL] = level }
     }
 
     suspend fun setBatterySaverMode(enabled: Boolean) {

@@ -2,6 +2,8 @@ package com.meshrelief.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.meshrelief.data.db.AppDatabase
 import com.meshrelief.data.db.dao.BulletinDao
 import com.meshrelief.data.db.dao.CampDao
@@ -15,6 +17,24 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+// v1 → v2: added publicKeyBytes column (Bug 5 / Bug 16)
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE peers ADD COLUMN publicKeyBytes BLOB NOT NULL DEFAULT ''"
+        )
+    }
+}
+
+// v2 → v3: added linkQuality column (Recommendation 5)
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE peers ADD COLUMN linkQuality INTEGER NOT NULL DEFAULT 0"
+        )
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -27,7 +47,9 @@ object DatabaseModule {
         context,
         AppDatabase::class.java,
         "meshrelief_db"
-    ).build()
+    )
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        .build()
 
     @Provides
     fun provideMessageDao(db: AppDatabase): MessageDao = db.messageDao()

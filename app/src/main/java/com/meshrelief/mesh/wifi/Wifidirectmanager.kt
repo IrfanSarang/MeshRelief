@@ -10,6 +10,8 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.WifiP2pManager.Channel
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,72 +20,46 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * WifiDirectManager
- *
- * Manages WiFi P2P lifecycle: initialization, peer discovery, connection,
- * and disconnection. Exposes discovered peers as a [StateFlow].
- *
- * Lifecycle is owned entirely by [MeshForegroundService]:
- *   - [initialize] is called once in Service.onCreate()
- *   - [shutdown]   is called once in Service.onDestroy()
- *
- * [initialize] is idempotent — safe to call multiple times; it returns
- * early if already initialized. This prevents duplicate BroadcastReceiver
- * registration and redundant peer discovery calls (Issue #17).
- */
 @Singleton
 class WifiDirectManager @Inject constructor(
     @ApplicationContext private val context: Context
-) {
+) : MeshTransport {
 
     private val TAG = "WifiDirectManager"
 
-    // ── WiFi P2P system services ──────────────────────────────────────────
     private val wifiP2pManager: WifiP2pManager =
         context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
 
     private var channel: Channel? = null
 
-    // ── Lifecycle guards (Issue #17) ──────────────────────────────────────
-    /**
-     * True once [initialize] has completed successfully.
-     * Prevents re-initialization on every Activity.onResume call.
-     */
     private var isInitialized = false
-
-    /**
-     * True while the [BroadcastReceiver] is registered.
-     * Prevents double-registration and "Receiver not registered" crashes.
-     */
     private var isReceiverRegistered = false
 
-    // ── Peer list state ───────────────────────────────────────────────────
+    private var wasConnected = false
+    private var reconnectAttempt = 0
+    private val reconnectHandler = Handler(Looper.getMainLooper())
+
     private val _peerList = MutableStateFlow<List<WifiP2pDevice>>(emptyList())
     val peerList: StateFlow<List<WifiP2pDevice>> = _peerList.asStateFlow()
 
-    // ── Connected peer IPs ────────────────────────────────────────────────
-    /**
-     * Emits the list of actual IP addresses of currently connected peers.
-     *
-     * - If this device is the **Group Owner**: reads the ARP table from
-     *   /proc/net/arp to find IPs of connected clients.
-     * - If this device is a **client**: emits just the group owner's IP,
-     *   since that is the only directly reachable peer.
-     *
-     * Updated every time [WIFI_P2P_CONNECTION_CHANGED_ACTION] fires.
-     */
     private val _connectedPeerIPs = MutableStateFlow<List<String>>(emptyList())
-    val connectedPeerIPs: StateFlow<List<String>> = _connectedPeerIPs.asStateFlow()
+    override val connectedPeerIPs: StateFlow<List<String>> = _connectedPeerIPs.asStateFlow()
 
-    // ── Connection info ───────────────────────────────────────────────────
-    /** True when this device is the Group Owner in an active P2P group. */
-    private var isGroupOwner: Boolean = false
+    private var _isGroupOwner: Boolean = false
+    private var groupOwnerAddr: String? = null
 
-    /** IP address of the group owner (set when connection info arrives). */
-    private var groupOwnerAddress: String? = null
+    // ── Scheduled discovery (battery-saver mode) ──────────────────────────
+    private var discoveryIntervalMs: Long = 0L
+    private val discoveryHandler = Handler(Looper.getMainLooper())
+    private val discoveryRunnable: Runnable = object : Runnable {
+        override fun run() {
+            discoverPeers()
+            if (discoveryIntervalMs > 0) {
+                discoveryHandler.postDelayed(this, discoveryIntervalMs)
+            }
+        }
+    }
 
-    // ── BroadcastReceiver ─────────────────────────────────────────────────
     private val intentFilter = IntentFilter().apply {
         addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
         addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
@@ -103,7 +79,6 @@ class WifiDirectManager @Inject constructor(
                 }
 
                 WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                    // Peer list has changed — request the updated list
                     channel?.let { ch ->
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             wifiP2pManager.requestPeers(ch) { peerListResult ->
@@ -124,18 +99,18 @@ class WifiDirectManager @Inject constructor(
                     channel?.let { ch ->
                         wifiP2pManager.requestConnectionInfo(ch) { info ->
                             if (info.groupFormed) {
-                                isGroupOwner = info.isGroupOwner
-                                groupOwnerAddress = info.groupOwnerAddress?.hostAddress
+                                reconnectAttempt = 0
+                                reconnectHandler.removeCallbacksAndMessages(null)
+
+                                _isGroupOwner = info.isGroupOwner
+                                groupOwnerAddr = info.groupOwnerAddress?.hostAddress
                                 Log.d(
                                     TAG,
-                                    "Group formed. isOwner=$isGroupOwner " +
-                                            "ownerAddr=$groupOwnerAddress"
+                                    "Group formed. isOwner=$_isGroupOwner " +
+                                            "ownerAddr=$groupOwnerAddr"
                                 )
 
-                                // ── Populate connectedPeerIPs ──────────────
                                 if (info.isGroupOwner) {
-                                    // We are the GO: connected clients are
-                                    // listed in the ARP table after DHCP lease.
                                     _connectedPeerIPs.value = getConnectedClientIPs()
                                     Log.d(
                                         TAG,
@@ -143,25 +118,28 @@ class WifiDirectManager @Inject constructor(
                                                 "via ARP: ${_connectedPeerIPs.value}"
                                     )
                                 } else {
-                                    // We are a client: only reachable peer is the GO.
                                     val ownerIp = info.groupOwnerAddress?.hostAddress
                                     _connectedPeerIPs.value = listOfNotNull(ownerIp)
                                     Log.d(TAG, "Client mode: GO IP = $ownerIp")
                                 }
-                                // ──────────────────────────────────────────
 
                             } else {
-                                isGroupOwner = false
-                                groupOwnerAddress = null
+                                _isGroupOwner = false
+                                groupOwnerAddr = null
                                 _connectedPeerIPs.value = emptyList()
                                 Log.d(TAG, "Group dissolved — peer IP list cleared.")
+
+                                if (wasConnected) {
+                                    scheduleReconnect()
+                                }
                             }
+
+                            wasConnected = info.groupFormed
                         }
                     }
                 }
 
                 WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
-                    // This device's own details changed (name, status, etc.)
                     Log.d(TAG, "This device changed.")
                 }
             }
@@ -170,16 +148,6 @@ class WifiDirectManager @Inject constructor(
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
-    /**
-     * Initializes the P2P channel, registers the BroadcastReceiver, and
-     * triggers the first peer discovery pass.
-     *
-     * **Idempotent** — safe to call multiple times. Returns immediately if
-     * already initialized, preventing duplicate receiver registration and
-     * redundant discovery calls (Issue #17 fix).
-     *
-     * Should be called once from [MeshForegroundService.onCreate].
-     */
     @SuppressLint("MissingPermission")
     fun initialize() {
         if (isInitialized) {
@@ -188,8 +156,6 @@ class WifiDirectManager @Inject constructor(
         }
 
         channel = wifiP2pManager.initialize(context, context.mainLooper) {
-            // Called if the framework kills the channel — reset flags and reinitialize.
-            // Flags are cleared first so the recursive call is allowed through.
             Log.w(TAG, "P2P channel disconnected; reinitializing.")
             isInitialized = false
             isReceiverRegistered = false
@@ -206,13 +172,10 @@ class WifiDirectManager @Inject constructor(
         discoverPeers()
     }
 
-    /**
-     * Unregisters the BroadcastReceiver and resets lifecycle state.
-     *
-     * Should be called once from [MeshForegroundService.onDestroy].
-     * Safe to call even if [initialize] was never called.
-     */
     fun shutdown() {
+        reconnectHandler.removeCallbacksAndMessages(null)
+        discoveryHandler.removeCallbacks(discoveryRunnable)
+        discoveryIntervalMs = 0L
         if (isReceiverRegistered) {
             try {
                 context.unregisterReceiver(receiver)
@@ -222,16 +185,12 @@ class WifiDirectManager @Inject constructor(
             }
         }
         isInitialized = false
+        wasConnected = false
         Log.d(TAG, "WifiDirectManager shut down.")
     }
 
     // ── Discovery ─────────────────────────────────────────────────────────
 
-    /**
-     * Starts WiFi P2P peer discovery. Results are delivered via the
-     * [WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION] broadcast, which
-     * triggers a [peerList] update automatically.
-     */
     @SuppressLint("MissingPermission")
     fun discoverPeers() {
         val ch = channel ?: run {
@@ -248,21 +207,56 @@ class WifiDirectManager @Inject constructor(
         })
     }
 
+    /**
+     * Sets a repeating discovery interval for battery-saver mode.
+     * Pass intervalMs > 0 to enable scheduled discovery at that cadence.
+     * Pass 0 to cancel scheduled discovery and revert to event-driven behaviour.
+     */
+    fun setDiscoveryInterval(intervalMs: Long) {
+        discoveryHandler.removeCallbacks(discoveryRunnable)
+        discoveryIntervalMs = intervalMs
+        if (intervalMs > 0 && isInitialized) {
+            Log.d(TAG, "Scheduled discovery interval set to ${intervalMs}ms")
+            discoveryHandler.postDelayed(discoveryRunnable, intervalMs)
+        } else {
+            Log.d(TAG, "Scheduled discovery disabled — reverting to event-driven discovery.")
+        }
+    }
+
+    // ── Reconnect ─────────────────────────────────────────────────────────
+
+    private fun scheduleReconnect() {
+        val delayMs = minOf(5_000L * (1 shl reconnectAttempt), 40_000L)
+        Log.w(TAG, "Scheduling reconnect attempt ${reconnectAttempt + 1} in ${delayMs}ms")
+        reconnectHandler.postDelayed({
+            reconnectAttempt++
+            Log.d(TAG, "Reconnect attempt $reconnectAttempt — calling discoverPeers()")
+            discoverPeers()
+        }, delayMs)
+    }
+
     // ── Connect / Disconnect ──────────────────────────────────────────────
 
     /**
-     * Initiates a WiFi P2P connection to the device at [deviceAddress].
-     * [deviceAddress] is the MAC address from a [WifiP2pDevice].
+     * Connects to a peer using WiFi Direct.
+     *
+     * @param deviceAddress MAC address of the target peer.
+     * @param groupOwnerIntent 0–15; higher value = stronger preference to become Group Owner.
+     *   Pass (batteryPercent / 10).coerceIn(0, 15) from the caller so that
+     *   the device with more battery naturally becomes the Group Owner.
+     *   Defaults to 7 (neutral / system-decided).
      */
     @SuppressLint("MissingPermission")
-    fun connectToPeer(deviceAddress: String) {
+    fun connectToPeer(deviceAddress: String, groupOwnerIntent: Int = 7) {
         val ch = channel ?: run {
             Log.w(TAG, "connectToPeer: channel not initialized.")
             return
         }
         val config = WifiP2pConfig().apply {
             this.deviceAddress = deviceAddress
+            this.groupOwnerIntent = groupOwnerIntent.coerceIn(0, 15)
         }
+        Log.d(TAG, "Connecting to $deviceAddress with groupOwnerIntent=${config.groupOwnerIntent}")
         wifiP2pManager.connect(ch, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "Connect initiated to $deviceAddress")
@@ -273,9 +267,6 @@ class WifiDirectManager @Inject constructor(
         })
     }
 
-    /**
-     * Removes the current P2P group (disconnects all peers).
-     */
     fun disconnect() {
         val ch = channel ?: run {
             Log.w(TAG, "disconnect: channel not initialized.")
@@ -284,8 +275,10 @@ class WifiDirectManager @Inject constructor(
         wifiP2pManager.removeGroup(ch, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "Group removed (disconnected).")
-                isGroupOwner = false
-                groupOwnerAddress = null
+                _isGroupOwner = false
+                groupOwnerAddr = null
+                wasConnected = false
+                reconnectHandler.removeCallbacksAndMessages(null)
                 _connectedPeerIPs.value = emptyList()
             }
             override fun onFailure(reason: Int) {
@@ -294,32 +287,21 @@ class WifiDirectManager @Inject constructor(
         })
     }
 
+    // ── MeshTransport overrides ───────────────────────────────────────────
+
+    override fun getGroupOwnerAddress(): String? = groupOwnerAddr
+
+    override fun isGroupOwner(): Boolean = _isGroupOwner
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    /** Returns the group owner IP if a group is formed, null otherwise. */
-    fun getGroupOwnerAddress(): String? = groupOwnerAddress
-
-    /** True if this device is currently the group owner. */
-    fun isGroupOwner(): Boolean = isGroupOwner
-
-    /**
-     * Reads /proc/net/arp to find IP addresses of devices that have received
-     * a DHCP lease from this device (only meaningful when we are the Group Owner).
-     *
-     * The ARP table format is:
-     *   IP address  HW type  Flags  HW address  Mask  Device
-     *
-     * We skip incomplete/empty entries (Flags == 0x0) to avoid returning
-     * stale or unresolved entries.
-     */
     private fun getConnectedClientIPs(): List<String> {
         return try {
             java.io.File("/proc/net/arp")
                 .readLines()
-                .drop(1)                          // skip header line
+                .drop(1)
                 .mapNotNull { line ->
                     val parts = line.trim().split("\\s+".toRegex())
-                    // parts[0] = IP, parts[2] = flags ("0x2" means complete/valid)
                     val ip    = parts.getOrNull(0)
                     val flags = parts.getOrNull(2)
                     if (ip != null && flags != null && flags != "0x0") ip else null

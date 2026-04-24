@@ -29,14 +29,14 @@ data class SosPayload(
 @Serializable
 @SerialName("camp")
 data class CampPayload(
-    val campId      : String,
-    val name        : String,
-    val type        : String,
-    val capacity    : Int,
-    val occupancy   : Int,
-    val lat         : Double,
-    val lng         : Double,
-    val adminNotes  : String = ""
+    val campId     : String,
+    val name       : String,
+    val type       : String,
+    val capacity   : Int,
+    val occupancy  : Int,
+    val lat        : Double,
+    val lng        : Double,
+    val adminNotes : String = ""
 ) : MeshPayload()
 
 @Serializable
@@ -64,6 +64,18 @@ data class HeadcountResponsePayload(
     val lng      : Double
 ) : MeshPayload()
 
+// ── Added by Bug #7 ──────────────────────────────────────────────────────────
+
+@Serializable
+data class LatLng(val lat: Double, val lng: Double)
+
+@Serializable
+@SerialName("evacuation")
+data class EvacuationRoutePayload(
+    val label     : String,
+    val waypoints : List<LatLng>
+) : MeshPayload()
+
 // ── Encode helpers ────────────────────────────────────────────────────────────
 
 fun SosPayload.encode()               : String = MeshJson.encodeToString(SosPayload.serializer(),               this)
@@ -71,6 +83,7 @@ fun CampPayload.encode()              : String = MeshJson.encodeToString(CampPay
 fun StatusPayload.encode()            : String = MeshJson.encodeToString(StatusPayload.serializer(),            this)
 fun BulletinPayload.encode()          : String = MeshJson.encodeToString(BulletinPayload.serializer(),          this)
 fun HeadcountResponsePayload.encode() : String = MeshJson.encodeToString(HeadcountResponsePayload.serializer(), this)
+fun EvacuationRoutePayload.encode()   : String = MeshJson.encodeToString(EvacuationRoutePayload.serializer(),   this)
 
 // ── Decode extension functions on MeshPacket ──────────────────────────────────
 
@@ -79,3 +92,4 @@ fun MeshPacket.decodeCamp()              : CampPayload               = MeshJson.
 fun MeshPacket.decodeStatus()            : StatusPayload             = MeshJson.decodeFromString(StatusPayload.serializer(),            payload)
 fun MeshPacket.decodeBulletin()          : BulletinPayload           = MeshJson.decodeFromString(BulletinPayload.serializer(),          payload)
 fun MeshPacket.decodeHeadcountResponse() : HeadcountResponsePayload  = MeshJson.decodeFromString(HeadcountResponsePayload.serializer(), payload)
+fun MeshPacket.decodeEvacuationRoute()   : EvacuationRoutePayload    = MeshJson.decodeFromString(EvacuationRoutePayload.serializer(),   payload)

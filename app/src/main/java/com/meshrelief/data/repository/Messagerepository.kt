@@ -11,10 +11,8 @@ class MessageRepository @Inject constructor(private val dao: MessageDao) {
 
     fun getAllMessages(): Flow<List<MessageEntity>> = dao.getAllMessages()
 
-    // Issue #3 — group chat feed
     fun getGroupMessages(): Flow<List<MessageEntity>> = dao.getGroupMessages()
 
-    // Issue #3 — P2P thread for a specific peer pair
     fun getP2pMessages(myDeviceId: String, peerId: String): Flow<List<MessageEntity>> =
         dao.getP2pMessages(myDeviceId, peerId)
 
@@ -24,4 +22,8 @@ class MessageRepository @Inject constructor(private val dao: MessageDao) {
     suspend fun save(message: MessageEntity) = dao.insert(message)
 
     suspend fun pruneOlderThan(cutoff: Long) = dao.deleteOlderThan(cutoff)
+
+    // MISSING 3: called by ChatViewModel when an ACK packet arrives for a
+    // previously sent message — flips isDelivered so the UI can show a tick.
+    suspend fun markDelivered(messageId: String) = dao.markDelivered(messageId)
 }

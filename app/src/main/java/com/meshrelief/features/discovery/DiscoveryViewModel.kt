@@ -40,7 +40,7 @@ data class DiscoveryUiState(
 @HiltViewModel
 class DiscoveryViewModel @Inject constructor(
     private val wifiDirectManager: WifiDirectManager,
-    private val peerRepository: PeerRepository          // ← NEW injection
+    private val peerRepository: PeerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiscoveryUiState())
@@ -50,7 +50,7 @@ class DiscoveryViewModel @Inject constructor(
 
     init {
         observePeerList()
-        observeConnectedPeerIPs()   // ← NEW: watch connection changes from WifiDirectManager
+        observeConnectedPeerIPs()
         startScan()
     }
 
@@ -71,7 +71,7 @@ class DiscoveryViewModel @Inject constructor(
 
                 _uiState.update { state ->
                     state.copy(
-                        scanState         = ScanState.IDLE,
+                        scanState          = ScanState.IDLE,
                         lastScanMinutesAgo = 0,
                         // Preserve CONNECTING / CONNECTED states that were set
                         // by connectToPeer() so they are not wiped by a fresh
@@ -90,12 +90,9 @@ class DiscoveryViewModel @Inject constructor(
     // ── Watch connectedPeerIPs to flip UI state → CONNECTED ───────────────
     //
     // WifiDirectManager emits connectedPeerIPs on WIFI_P2P_CONNECTION_CHANGED_ACTION.
-    // When IPs appear it means a group is formed; we cross-reference by device
-    // address (MAC) that was passed to connectToPeer() to mark the right peer.
-    //
-    // Note: connectedPeerIPs carries IP addresses, not MACs. The peer whose
-    // connectionState is currently CONNECTING is the one we just called
-    // connectToPeer() on — that is the peer we flip to CONNECTED here.
+    // When IPs appear it means a group is formed; the peer whose connectionState
+    // is currently CONNECTING is the one we just called connectToPeer() on —
+    // that is the peer we flip to CONNECTED here.
     private fun observeConnectedPeerIPs() {
         viewModelScope.launch {
             wifiDirectManager.connectedPeerIPs.collect { ips ->
@@ -145,17 +142,29 @@ class DiscoveryViewModel @Inject constructor(
 
     // ── Connect using real device address (MAC) ───────────────────────────
     //
-    // peerId == WifiP2pDevice.deviceAddress (MAC).
+    // peerId        == WifiP2pDevice.deviceAddress (MAC address).
+    // batteryPercent == current battery level (0–100) of THIS device.
+    //
+    // groupOwnerIntent is derived as (batteryPercent / 10).coerceIn(0, 15).
+    // A device with more battery gets a higher intent value, making it more
+    // likely to become the Group Owner (which consumes more power) — so the
+    // stronger battery naturally hosts the group.
+    //
     // CONNECTED state is set in observeConnectedPeerIPs() when the framework
-    // fires WIFI_P2P_CONNECTION_CHANGED_ACTION and connectedPeerIPs becomes
-    // non-empty — no fake delay needed.
-    fun connectToPeer(peerId: String) {
+    // fires WIFI_P2P_CONNECTION_CHANGED_ACTION — no fake delay needed.
+    fun connectToPeer(peerId: String, batteryPercent: Int) {
+        val groupOwnerIntent = (batteryPercent / 10).coerceIn(0, 15)
+
         _uiState.update { state ->
             state.copy(peers = state.peers.map { p ->
                 if (p.id == peerId) p.copy(connectionState = ConnectionState.CONNECTING) else p
             })
         }
-        wifiDirectManager.connectToPeer(peerId)
+
+        wifiDirectManager.connectToPeer(
+            deviceAddress    = peerId,
+            groupOwnerIntent = groupOwnerIntent
+        )
     }
 
     fun setSortMode(mode: SortMode) {
@@ -188,18 +197,17 @@ class DiscoveryViewModel @Inject constructor(
     // are left at their defaults and will be overwritten when the peer
     // sends a handshake packet over the established P2P link.
     private fun WifiP2pDevice.toPeerEntity(): PeerEntity = PeerEntity(
-        deviceId     = deviceAddress,                       // MAC — Room primary key
+        deviceId     = deviceAddress,
         name         = deviceName.ifBlank { "Unknown Device" },
-        phone4       = deviceAddress.takeLast(4)            // placeholder until handshake
-            .replace(":", ""),
-        verified     = false,                               // set true after handshake
+        phone4       = deviceAddress.takeLast(4).replace(":", ""),
+        verified     = false,
         flagged      = false,
-        triageStatus = "NONE",                              // updated via mesh packet
-        battery      = 100,                                 // unknown until handshake
+        triageStatus = "NONE",
+        battery      = 100,
         lat          = 0.0,
         lng          = 0.0,
         lastSeen     = System.currentTimeMillis(),
-        hopCount     = 0                                    // direct peer = 0 hops
+        hopCount     = 0
     )
 
     /**
@@ -231,7 +239,6 @@ class DiscoveryViewModel @Inject constructor(
                 prev.connectionState != ConnectionState.AVAILABLE &&
                 peer.connectionState == ConnectionState.AVAILABLE
             ) {
-                // Keep the in-progress state; framework hasn't caught up yet
                 peer.copy(connectionState = prev.connectionState)
             } else {
                 peer

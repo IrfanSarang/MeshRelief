@@ -53,6 +53,8 @@ import com.meshrelief.features.navigate.NavigateToCampScreen
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var wifiDirectManager: WifiDirectManager
+    // BUG 1 FIX: inject AppEventBus — no more static object access
+    @Inject lateinit var appEventBus: AppEventBus
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LocationPermissionGate {
-                AppRoot()
+                AppRoot(appEventBus = appEventBus)
             }
         }
     }
@@ -115,7 +117,8 @@ private fun LocationPermissionGate(content: @Composable () -> Unit) {
 
 @Composable
 fun AppRoot(
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel(),
+    appEventBus: AppEventBus                      // BUG 1 FIX: passed from MainActivity
 ) {
     val setupComplete by viewModel.setupComplete.collectAsState()
 
@@ -129,13 +132,14 @@ fun AppRoot(
     var currentScreen by remember(setupComplete) {
         mutableStateOf(if (setupComplete == true) "home" else "setup")
     }
-    var selectedCampId     by remember { mutableStateOf<String?>(null) }
-    var navigateToCampId   by remember { mutableStateOf<String?>(null) }
+    var selectedCampId   by remember { mutableStateOf<String?>(null) }
+    var navigateToCampId by remember { mutableStateOf<String?>(null) }
     var incomingSosPacket by remember { mutableStateOf<MeshPacket?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        AppEventBus.incomingSos.collect { packet ->
+        // BUG 1 FIX: use injected instance, not AppEventBus object
+        appEventBus.incomingSos.collect { packet ->
             incomingSosPacket = packet
             currentScreen     = "incomingsos"
         }
@@ -163,7 +167,8 @@ fun AppRoot(
             onAdminClick      = { currentScreen = "admin" },
             onFakeIncomingSos = if (BuildConfig.DEBUG) ({
                 scope.launch {
-                    AppEventBus.incomingSos.emit(
+                    // BUG 1 FIX: use injected instance
+                    appEventBus.incomingSos.emit(
                         MeshPacket(
                             id          = "fake-sos-001",
                             type        = PacketType.SOS_ALERT,
@@ -286,7 +291,7 @@ fun AppRoot(
                     AdminScreen(
                         onBack            = { currentScreen = "home" },
                         onEvacuationClick = { currentScreen = "evacuation" },
-                        onTopologyClick   = { currentScreen = "topology" }  // ← FIX #13
+                        onTopologyClick   = { currentScreen = "topology" }
                     )
                 }
                 false -> {
@@ -306,7 +311,7 @@ fun AppRoot(
         }
 
         "firstaid"   -> FirstAidScreen(onBack = { currentScreen = "home" })
-        "topology"   -> TopologyScreen(onBack = { currentScreen = "admin" })  // ← FIX #13 back→admin
+        "topology"   -> TopologyScreen(onBack = { currentScreen = "admin" })
         "evacuation" -> EvacuationRouteScreen(onBack = { currentScreen = "admin" })
     }
 }

@@ -2,12 +2,15 @@ package com.meshrelief.core.event
 
 import com.meshrelief.mesh.protocol.MeshPacket
 import kotlinx.coroutines.flow.MutableSharedFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Lightweight in-memory event bus for app-wide one-shot events.
- * No Android lifecycle dependency — safe as a plain object.
+ * Injected as a Hilt @Singleton — never accessed statically.
  */
-object AppEventBus {
+@Singleton
+class AppEventBus @Inject constructor() {
 
     // ── Existing ──────────────────────────────────────────────────────────
     val incomingSos = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 8)
@@ -18,23 +21,37 @@ object AppEventBus {
     val bulletin        = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 16)
 
     // ── Added by Issue #14 ────────────────────────────────────────────────
-    /**
-     * Peers emit a [MeshPacket] of type HEADCOUNT_RESPONSE here when they
-     * receive a HEADCOUNT_PING broadcast from the admin.
-     * The packet receiver (SocketServer / PacketRouter) must call
-     *   AppEventBus.headcountResponse.tryEmit(packet)
-     * for every incoming HEADCOUNT_RESPONSE packet.
-     *
-     * Buffer capacity matches HEADCOUNT_RESPONSE_TIMEOUT_S window: a mesh
-     * of up to 64 peers responding near-simultaneously won't drop events.
-     */
     val headcountResponse = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 64)
+
+    // ── Added by Bug #10 ─────────────────────────────────────────────────
+    val headcountPing     = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 4)
+
+    // ── Added by Bug #7 ──────────────────────────────────────────────────
+    val evacuationRoute = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 8)
+
+    // ── Added by Bug #9 ──────────────────────────────────────────────────
+    val deviceStatus = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 32)
+
+    val peerHandshake = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 16)
+
+    // ── Added by MISSING 3 ───────────────────────────────────────────────
+    val ack = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 64)
+
+    // ── Added by MISSING 4 ───────────────────────────────────────────────
+    // Emitted by MeshRouter when PEER_VERIFY / PEER_FLAG packets arrive.
+    // Collected by MeshForegroundService to persist verified/flagged state.
+    val peerVerify = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 8)
+    val peerFlag   = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 8)
+
+    val sosCancel  = MutableSharedFlow<MeshPacket>(extraBufferCapacity = 8)
+
+    val peerHopCount = MutableSharedFlow<Pair<String, Int>>(extraBufferCapacity = 32)
 }
 
 /** Minimal SOS payload. Expand fields when WiFi Direct lands (Issue #9). */
 data class SosPacket(
     val senderName: String,
-    val message: String,
-    val latitude: Double? = null,
-    val longitude: Double? = null
+    val message   : String,
+    val latitude  : Double? = null,
+    val longitude : Double? = null
 )

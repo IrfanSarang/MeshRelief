@@ -125,7 +125,7 @@ class DeviceIdentity @Inject constructor(
             Settings.Secure.ANDROID_ID
         ) ?: "unknown"
 
-        val raw = "$androidId$phoneNumber${System.currentTimeMillis()}"
+        val raw = "$androidId$phoneNumber"
         return sha256(raw)
     }
 
